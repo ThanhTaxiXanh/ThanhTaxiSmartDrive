@@ -70,7 +70,7 @@ class SurveyNavigationPreviewTest {
         } catch (_:IllegalArgumentException) {}
         try {
             OfflineRouteGraph(nodes.map { if(it.id=="A")
-                it.copy(aliases=listOf("Sai\\nDữ liệu")) else it },edges,turns)
+                it.copy(aliases=listOf("Sai"+10.toChar()+"Dữ liệu")) else it },edges,turns)
             fail("control char in alias")
         } catch (_:IllegalArgumentException) {}
     }
