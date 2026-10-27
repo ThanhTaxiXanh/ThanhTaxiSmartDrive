@@ -6,6 +6,9 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.location.Location
@@ -30,6 +33,8 @@ import com.thanhtaxi.smartdrive.media.MediaAccessService
 import org.maplibre.android.MapLibre
 import org.maplibre.android.annotations.Marker
 import org.maplibre.android.annotations.MarkerOptions
+import org.maplibre.android.annotations.Icon
+import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
@@ -66,6 +71,8 @@ class MainActivity : Activity(), LocationListener {
     private var roadPack: RoadPack? = null
     private var roadLines: List<RoadLine> = emptyList()
     private val signMarkers = mutableListOf<Marker>()
+    private var vehicleMarker: Marker? = null
+    private var vehicleIcon: Icon? = null
     private var lastMarkerLocation: Location? = null
     private var mediaController: MediaController? = null
     private val prefs by lazy { getSharedPreferences("taxi", MODE_PRIVATE) }
@@ -84,6 +91,23 @@ class MainActivity : Activity(), LocationListener {
     private fun label(text: String, size: Float = 18f): TextView = TextView(this).apply {
         this.text = text; textSize = size; setTextColor(Color.WHITE); setPadding(14, 10, 14, 8)
     }
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+    private fun limitCircle(hasValue: Boolean) = GradientDrawable().apply {
+        shape = GradientDrawable.OVAL
+        setColor(if (hasValue) Color.WHITE else Color.rgb(42, 50, 57))
+        setStroke(dp(5), if (hasValue) Color.RED else Color.GRAY)
+    }
+    private fun positionIcon(): Icon {
+        vehicleIcon?.let { return it }
+        val bitmap = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+        canvas.drawCircle(24f, 24f, 18f, paint)
+        paint.color = Color.rgb(26, 120, 245)
+        canvas.drawCircle(24f, 24f, 14f, paint)
+        vehicleIcon = IconFactory.getInstance(this).fromBitmap(bitmap)
+        return vehicleIcon!!
+    }
     private fun buildDashboard(state: Bundle?) {
         val landscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         val root = LinearLayout(this).apply {
@@ -99,7 +123,9 @@ class MainActivity : Activity(), LocationListener {
             map = m
             m.setStyle(prefs.getString("style", "https://demotiles.maplibre.org/style.json")!!) {
                 lastMarkerLocation = null
+                vehicleMarker = null
                 renderNearbySigns(lastLocation)
+                lastLocation?.let { follow(it) }
             }
             m.cameraPosition = CameraPosition.Builder().target(LatLng(21.033, 105.85)).zoom(12.0).build()
             lastLocation?.let { follow(it) }
@@ -111,14 +137,24 @@ class MainActivity : Activity(), LocationListener {
         }
         val speedRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         speedLabel = label("-- km/h", 28f).apply { setTypeface(null, Typeface.BOLD) }
-        limitLabel = label("GH: --", 28f).apply {
+        limitLabel = label("--", 28f).apply {
             setTypeface(null, Typeface.BOLD)
-            setTextColor(Color.rgb(255, 208, 66))
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            background = limitCircle(false)
+            setPadding(0,0,0,0)
         }
-        speedRow.addView(speedLabel); speedRow.addView(limitLabel)
+        speedRow.addView(speedLabel)
+        speedRow.addView(limitLabel, LinearLayout.LayoutParams(dp(78),dp(78)).apply {
+            leftMargin = dp(10)
+        })
         info.addView(speedRow)
         gpsLabel = label("Đang chờ tín hiệu GPS", 14f); info.addView(gpsLabel)
-        signLabel = label("Giới hạn: Chưa xác minh", 13f); info.addView(signLabel)
+        signLabel = label("Giới hạn: Chưa xác minh", 13f).apply {
+            maxLines = 3
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        info.addView(signLabel)
         mapPane.addView(info, FrameLayout.LayoutParams(-2,-2, Gravity.TOP or Gravity.START))
         if (landscape) {
             val settings = Button(this).apply {
@@ -215,7 +251,16 @@ class MainActivity : Activity(), LocationListener {
         refreshData()
     }
     private fun follow(location: Location) {
-        map?.cameraPosition = CameraPosition.Builder()
+        val m = map ?: return
+        if (m.style == null) return
+        if (location.hasAccuracy() && location.accuracy <= 40f) {
+            vehicleMarker?.let { m.removeMarker(it) }
+            vehicleMarker = m.addMarker(MarkerOptions()
+                .position(LatLng(location.latitude, location.longitude))
+                .title("GPS: vị trí ước tính của xe")
+                .icon(positionIcon()))
+        }
+        m.cameraPosition = CameraPosition.Builder()
             .target(LatLng(location.latitude, location.longitude))
             .zoom(16.0).bearing(if (location.hasBearing()) location.bearing.toDouble() else 0.0)
             .build()
@@ -247,7 +292,8 @@ class MainActivity : Activity(), LocationListener {
         else engine.resolve(context, pack?.signs.orEmpty() + listOfNotNull(decision.speedEvidence), now)
         val level = compliance.grade(SpeedObservation(speed, speedReliable), limit, prefs.getInt("tolerance",3))
         speedLabel.text = if (speed == null) "-- km/h" else "${speed.toInt()} km/h"
-        limitLabel.text = "GH: ${limit.kph?.toString() ?: "--"}"
+        limitLabel.text = limit.kph?.toString() ?: "--"
+        limitLabel.background = limitCircle(limit.kph != null)
         val next = decision.upcoming.joinToString(" • ") {
             val code = when(it.kind) { SignKind.R_420 -> "R.420"; SignKind.R_421 -> "R.421";
                 SignKind.P_127 -> "P.127 ${it.kph ?: "--"}"; SignKind.END_SPEED -> "Hết hạn chế" }
@@ -262,8 +308,9 @@ class MainActivity : Activity(), LocationListener {
             segment == null -> "GPS tốt • Chưa có đoạn đường được xác minh"
             else -> "GPS: ${loc!!.accuracy.toInt()}m • Đoạn: ${segment.id}"
         }
-        limitLabel.setTextColor(if (level == SpeedSeverity.OVER || level == SpeedSeverity.SERIOUS)
-            Color.RED else Color.rgb(255, 208, 66))
+        limitLabel.setTextColor(if (limit.kph != null) Color.BLACK else Color.WHITE)
+        speedLabel.setTextColor(if (level == SpeedSeverity.OVER || level == SpeedSeverity.SERIOUS)
+            Color.RED else Color.WHITE)
         if (prefs.getBoolean("soundAlert", false) &&
             alertDebouncer.shouldAlert(level, SystemClock.elapsedRealtime())) {
             try {
@@ -355,6 +402,8 @@ class MainActivity : Activity(), LocationListener {
     override fun onDestroy() {
         map?.removeAnnotations(signMarkers)
         signMarkers.clear()
+        vehicleMarker?.let { map?.removeMarker(it) }
+        vehicleMarker = null
         tone?.release()
         tone = null
         mapView.onDestroy()
