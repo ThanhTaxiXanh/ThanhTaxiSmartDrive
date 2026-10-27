@@ -749,7 +749,11 @@ class MainActivity : Activity(), LocationListener {
         promptPolicy.reset()
         navPanel.visibility=View.VISIBLE
         navText.text="Đang xác thực và nạp tuyến có hướng…"
-        val copy=RoutePlan(routeNodes.toList(),routeEdges.toList(),metres,routeContext)
+        val refreshedContext=routeContext?.let {
+            RouteAccessContext.atVietnamTime(it.vehicle,System.currentTimeMillis())
+        }
+        val copy=RoutePlan(routeNodes.toList(),routeEdges.toList(),
+            metres,refreshedContext)
         navWorker.execute {
             val nav=runCatching {
                 val total=copy.edgeIds.sumOf { id ->
@@ -792,7 +796,8 @@ class MainActivity : Activity(), LocationListener {
             fix.speed.toDouble().takeIf { fix.hasSpeed() },
             fix.isFromMockProvider)
         navWorker.execute {
-            val next=engine.observe(sample,SystemClock.elapsedRealtime())
+            val next=engine.observe(sample,SystemClock.elapsedRealtime(),
+                System.currentTimeMillis())
             runOnUiThread {
                 if(isFinishing || isDestroyed || generation!=navGeneration ||
                     activeNavigation!==engine) return@runOnUiThread

@@ -77,6 +77,29 @@ class RoutingRestrictionsTest {
         assertNull(OfflineRouteGraph(all,edges,defaultTurns).route("C","A",ctx()))
     }
 
+    @Test fun activeSessionSuspendsWhenLocalWindowStartsOrClockUnavailable() {
+        val ban=SurveyAccessRule(closures=listOf(
+            SurveyClosure(setOf(2),420,540)),sourceRef="user-survey-closure")
+        val g=OfflineRouteGraph(all,edges.map { if(it.id=="bc")
+            it.copy(access=ban)else it },defaultTurns)
+        val plan=g.route("A","C",ctx(day=2,minute=400))!!
+        val nav=ActiveNavigationEngine(g)
+        nav.start(plan)
+        val allowedAt=LocalDateTime.of(2026,10,27,6,40)
+            .atZone(ZoneId.of("Asia/Ho_Chi_Minh")).toInstant().toEpochMilli()
+        val bannedAt=LocalDateTime.of(2026,10,27,7,5)
+            .atZone(ZoneId.of("Asia/Ho_Chi_Minh")).toInstant().toEpochMilli()
+        val fix=NavigationFix(21.0,106.0003,3.0,1000,90.0,4.0)
+        assertEquals(NavigationPhase.GPS_UNCERTAIN,
+            nav.observe(fix,1000).phase) // no wall clock: fail closed
+        assertEquals(NavigationPhase.ACTIVE,
+            nav.observe(fix.copy(elapsedMs=2000),2000,allowedAt).phase)
+        assertEquals(NavigationPhase.GPS_UNCERTAIN,
+            nav.observe(fix.copy(elapsedMs=3000),3000,bannedAt).phase)
+        assertNull(nav.current.nextManeuver)
+        assertNull(nav.current.etaSeconds)
+    }
+
     @Test fun timestampUsesVietnamTimezoneWithoutHostLocalTimezone() {
         val millis=LocalDateTime.of(2026,10,27,8,30).atZone(
             ZoneId.of("Asia/Ho_Chi_Minh")).toInstant().toEpochMilli()

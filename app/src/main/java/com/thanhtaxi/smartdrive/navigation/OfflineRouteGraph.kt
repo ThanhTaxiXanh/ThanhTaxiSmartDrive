@@ -89,6 +89,26 @@ class OfflineRouteGraph(
     fun isEdgeAllowed(id: String, context: RouteAccessContext? = null): Boolean =
         edgesById[id]?.let { it.reviewed && it.access.permits(context) }==true
 
+    fun hasConditionalRules(plan: RoutePlan): Boolean {
+        if(plan.edgeIds.any { edgesById[it]?.access?.conditional==true }) return true
+        return plan.edgeIds.zipWithNext().any { (a,b) ->
+            rulesByTurn[a to b]?.conditional==true
+        }
+    }
+
+    /** Confident graph check only. It never establishes permission on real roads. */
+    fun isRouteEligible(plan: RoutePlan, context: RouteAccessContext?): Boolean {
+        if(plan.nodeIds.size!=plan.edgeIds.size+1 ||
+            plan.nodeIds.any { it !in nodes }) return false
+        for(i in plan.edgeIds.indices) {
+            val e=edgesById[plan.edgeIds[i]] ?:return false
+            if(e.from!=plan.nodeIds[i] || e.to!=plan.nodeIds[i+1] ||
+                !isEdgeAllowed(e.id,context))return false
+            if(i>0 && !hasReviewedTurn(plan.edgeIds[i-1],e.id,context))return false
+        }
+        return true
+    }
+
     /**
      * Dijkstra over (node, preceding directed edge). Every intermediate turn
      * needs an explicit allowlist entry. No optimistic turn assumptions.

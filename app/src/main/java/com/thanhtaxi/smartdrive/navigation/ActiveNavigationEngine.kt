@@ -108,8 +108,22 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
         return last
     }
 
-    fun observe(fix: NavigationFix, nowElapsedMs: Long): NavigationUpdate {
+    fun observe(fix: NavigationFix, nowElapsedMs: Long,
+                nowEpochMs: Long? = null): NavigationUpdate {
         val plan=route ?: return last
+        // Imported time windows are checked again for each fix, not only
+        // at route selection. If current civil time is unavailable or the
+        // survey rule changes status, suspend geometry commentary.
+        if(graph.hasConditionalRules(plan)) {
+            val ctx=plan.accessContext
+            if(ctx==null || nowEpochMs==null || nowEpochMs<0)
+                return suspendForUncertainGps()
+            val liveCtx=runCatching {
+                RouteAccessContext.atVietnamTime(ctx.vehicle,nowEpochMs)
+            }.getOrNull() ?:return suspendForUncertainGps()
+            if(!graph.isRouteEligible(plan,liveCtx))
+                return suspendForUncertainGps()
+        }
         if(last.phase==NavigationPhase.ARRIVED) return last
         val age=nowElapsedMs-fix.elapsedMs
         if(fix.isMock || !fix.lat.isFinite() || !fix.lon.isFinite() ||
