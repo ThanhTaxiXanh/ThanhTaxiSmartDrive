@@ -31,6 +31,14 @@ import com.thanhtaxi.smartdrive.data.RoadPack
 import com.thanhtaxi.smartdrive.data.RoadPackRepository
 import com.thanhtaxi.smartdrive.domain.*
 import com.thanhtaxi.smartdrive.media.MediaAccessService
+import com.thanhtaxi.smartdrive.navigation.ActiveNavigationEngine
+import com.thanhtaxi.smartdrive.navigation.NavigationFix
+import com.thanhtaxi.smartdrive.navigation.NavigationPhase
+import com.thanhtaxi.smartdrive.navigation.NavigationUpdate
+import com.thanhtaxi.smartdrive.navigation.RoutePlan
+import com.thanhtaxi.smartdrive.navigation.RoutePreviewInstructions
+import org.maplibre.android.annotations.Polyline
+import org.maplibre.android.annotations.PolylineOptions
 import com.thanhtaxi.smartdrive.offline.MapStyleDefaults
 import com.thanhtaxi.smartdrive.offline.PmtilesArchiveStore
 import com.thanhtaxi.smartdrive.offline.PmtilesHeader
@@ -91,6 +99,16 @@ class MainActivity : Activity(), LocationListener {
     private val stableMatcher = StableRoadMatcher()
     private val topologyGate = RoadTopologyGate()
     private var stableMatch: RoadMatch? = null
+    private val navWorker=Executors.newSingleThreadExecutor()
+    private var navGeneration=0
+    private var activeNavigation: ActiveNavigationEngine?=null
+    private var navRoute: RoutePlan?=null
+    private var navUpdate=NavigationUpdate(NavigationPhase.IDLE,"Chưa chọn hành trình")
+    private var navPolyline: Polyline?=null
+    private lateinit var navPanel: LinearLayout
+    private lateinit var navText: TextView
+    private lateinit var navStop: Button
+    private lateinit var navAccept: Button
     private val signEngine = TrafficSignEngine()
     private var roadPack: RoadPack? = null
     private var roadLines: List<RoadLine> = emptyList()
@@ -216,6 +234,37 @@ class MainActivity : Activity(), LocationListener {
             bottomMargin = dp(38)
             leftMargin = dp(5)
         })
+        navPanel=LinearLayout(this).apply {
+            orientation=LinearLayout.VERTICAL
+            setBackgroundColor(0xDF172330.toInt())
+            setPadding(dp(8),dp(6),dp(8),dp(6))
+            visibility=View.GONE
+        }
+        navText=label("Chưa chọn tuyến khảo sát thử.",14f).apply {
+            maxLines=3
+            setTextColor(Color.WHITE)
+        }
+        navPanel.addView(navText)
+        val actions=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+        navStop=Button(this).apply {
+            text="Dừng tuyến"
+            contentDescription="Dừng theo dõi hành trình thử"
+            setOnClickListener { stopActiveNavigation() }
+        }
+        navAccept=Button(this).apply {
+            text="Chọn tuyến khác (khi đỗ)"
+            visibility=View.GONE
+            setOnClickListener { acceptSuggestedRoute() }
+        }
+        actions.addView(navStop,LinearLayout.LayoutParams(0,dp(44),1f))
+        actions.addView(navAccept,LinearLayout.LayoutParams(0,dp(44),1.5f))
+        navPanel.addView(actions)
+        mapPane.addView(navPanel,FrameLayout.LayoutParams(-1,-2,
+            Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+            bottomMargin=dp(94)
+            leftMargin=dp(6)
+            rightMargin=dp(6)
+        })
         val info = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(8, 8, 8, 8)
@@ -339,6 +388,7 @@ class MainActivity : Activity(), LocationListener {
         }
         if(key==selectedStyleKey) return
         selectedStyleKey=key
+        navPolyline=null
         val epoch=++currentStyleEpoch
         offlineHeader=null
         labelSampler?.setEnabled(false)
@@ -349,6 +399,7 @@ class MainActivity : Activity(), LocationListener {
                 lastMarkerLocation=null
                 vehicleMarker=null
                 renderNearbySigns(lastLocation)
+                drawNavigationRoute()
                 lastLocation?.let { follow(it) } ?: run {
                     m.cameraPosition=CameraPosition.Builder().target(LatLng(21.28,106.19)).zoom(12.0).build()
                 }
@@ -380,6 +431,7 @@ class MainActivity : Activity(), LocationListener {
                     m.setStyle(Style.Builder().fromJson(generatedStyle)) {
                         if(epoch!=currentStyleEpoch) return@setStyle
                         offlineHeader=selected
+                        drawNavigationRoute()
                         labelSampler?.setEnabled(validVector &&
                             prefs.getBoolean("showOfflineRoadLabels",true))
                         handler.postDelayed({ labelSampler?.schedule() },2200L)
@@ -463,6 +515,7 @@ class MainActivity : Activity(), LocationListener {
                 if(location.hasSpeed()) location.speed.toDouble() else null),roadIndex)
             else null
         stableMatch = topologyGate.accept(stableMatcher.observe(observedMatch,lastFixElapsedMs))
+        updateActiveNavigation(location)
         follow(location)
         renderNearbySigns(location)
         refreshData()
@@ -636,6 +689,148 @@ class MainActivity : Activity(), LocationListener {
             mediaController = null; mediaLabel.text = "Media: cần cấp quyền Notification Listener"
         }
     }
+    private fun receiveActiveNavigationIntent(source: Intent?) {
+        val routeNodes=source?.getStringArrayListExtra("navigationNodes")
+        val routeEdges=source?.getStringArrayListExtra("navigationEdges")
+        if(routeNodes==null || routeEdges==null) return
+        val metres=source.getDoubleExtra("navigationMeters",Double.NaN)
+        source.removeExtra("navigationNodes")
+        source.removeExtra("navigationEdges")
+        source.removeExtra("navigationMeters")
+        // Never trust extras from an exported Activity without graph validation.
+        val graph=roadPack?.routeGraph
+        if(graph==null || routeEdges.isEmpty() || routeEdges.size>20_000 ||
+            routeNodes.size!=routeEdges.size+1 || !metres.isFinite() ||
+            metres<=0.0 || metres>1.0e8) {
+            Toast.makeText(this,"Không có gói tuyến khảo sát hợp lệ.",Toast.LENGTH_LONG).show()
+            return
+        }
+        val generation=++navGeneration
+        navPanel.visibility=View.VISIBLE
+        navText.text="Đang xác thực và nạp tuyến có hướng…"
+        val copy=RoutePlan(routeNodes.toList(),routeEdges.toList(),metres)
+        navWorker.execute {
+            val nav=runCatching {
+                val total=copy.edgeIds.sumOf { id ->
+                    val e=requireNotNull(graph.edge(id))
+                    require(e.reviewed)
+                    e.metres
+                }
+                require(kotlin.math.abs(total-copy.metres)<0.25)
+                RoutePreviewInstructions.generate(graph,copy)
+                ActiveNavigationEngine(graph).also { it.start(copy) }
+            }
+            runOnUiThread {
+                if(isFinishing || isDestroyed || generation!=navGeneration) return@runOnUiThread
+                if(nav.isFailure) {
+                    navPanel.visibility=View.GONE
+                    Toast.makeText(this,"Tuyến bị từ chối: ${nav.exceptionOrNull()?.message}",
+                        Toast.LENGTH_LONG).show()
+                } else {
+                    activeNavigation=nav.getOrThrow()
+                    navRoute=copy
+                    navUpdate=activeNavigation!!.current
+                    showNavigationState()
+                    drawNavigationRoute()
+                    Toast.makeText(this,"Đang theo tuyến thử; tuân thủ biển và đường thực tế.",
+                        Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun updateActiveNavigation(fix: Location) {
+        val engine=activeNavigation ?:return
+        val generation=navGeneration
+        val sample=NavigationFix(fix.latitude,fix.longitude,
+            fix.accuracy.toDouble().takeIf { fix.hasAccuracy() } ?: Double.NaN,
+            fix.elapsedRealtimeNanos/1_000_000L,
+            fix.bearing.toDouble().takeIf { fix.hasBearing() },
+            fix.speed.toDouble().takeIf { fix.hasSpeed() },
+            fix.isFromMockProvider)
+        navWorker.execute {
+            val next=engine.observe(sample,SystemClock.elapsedRealtime())
+            runOnUiThread {
+                if(isFinishing || isDestroyed || generation!=navGeneration ||
+                    activeNavigation!==engine) return@runOnUiThread
+                navUpdate=next
+                showNavigationState()
+            }
+        }
+    }
+
+    private fun showNavigationState() {
+        if(!::navPanel.isInitialized) return
+        navPanel.visibility=if(activeNavigation==null)View.GONE else View.VISIBLE
+        val state=navUpdate
+        val distance=state.remainingMeters?.let {
+            if(it>=1000.0) String.format(Locale.ROOT,"%.1f km",it/1000.0)
+            else "${it.toInt()} m"
+        } ?: "—"
+        val next=state.nextManeuver?.take(100) ?: state.message
+        navText.text="ĐIỀU HƯỚNG THỬ • ${state.phase.name} · Còn $distance\n$next"
+        navText.setTextColor(when(state.phase) {
+            NavigationPhase.ACTIVE -> Color.WHITE
+            NavigationPhase.ARRIVED -> Color.rgb(156,240,170)
+            else -> Color.rgb(255,197,115)
+        })
+        // Never offer a route-changing interaction while GPS indicates movement.
+        navAccept.visibility=if(state.alternative!=null && isStopped())
+            View.VISIBLE else View.GONE
+    }
+
+    private fun drawNavigationRoute() {
+        val m=map ?:return
+        if(m.style==null)return
+        navPolyline?.let { runCatching { m.removePolyline(it) } }
+        navPolyline=null
+        val plan=navRoute ?:return
+        val graph=roadPack?.routeGraph ?:return
+        val coords=plan.nodeIds.mapNotNull { graph.nodes[it] }
+            .map { LatLng(it.lat,it.lon) }
+        if(coords.size!=plan.nodeIds.size || coords.size<2)return
+        navPolyline=m.addPolyline(PolylineOptions().addAll(coords)
+            .color(Color.rgb(255,203,59)).width(6f))
+    }
+
+    private fun stopActiveNavigation() {
+        ++navGeneration
+        activeNavigation=null
+        navRoute=null
+        navUpdate=NavigationUpdate(NavigationPhase.IDLE,"Đã dừng hành trình")
+        if(::navPanel.isInitialized)navPanel.visibility=View.GONE
+        drawNavigationRoute()
+    }
+
+    private fun acceptSuggestedRoute() {
+        if(!isStopped()) {
+            Toast.makeText(this,"Chỉ chấp nhận tuyến thay thế khi xe đã đỗ.",
+                Toast.LENGTH_SHORT).show()
+            return
+        }
+        val engine=activeNavigation ?:return
+        val generation=navGeneration
+        navWorker.execute {
+            val updated=engine.acceptProposedRoute(parkedConfirmed=true)
+            val plan=engine.activeRoute
+            runOnUiThread {
+                if(generation!=navGeneration || activeNavigation!==engine ||
+                    isFinishing || isDestroyed) return@runOnUiThread
+                navRoute=plan
+                navUpdate=updated
+                showNavigationState()
+                drawNavigationRoute()
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        roadPack=RoadPackRepository(this).load()
+        receiveActiveNavigationIntent(intent)
+    }
+
     override fun onResume() {
         super.onResume(); mapView.onResume()
         roadPack = RoadPackRepository(this).load()
@@ -643,6 +838,7 @@ class MainActivity : Activity(), LocationListener {
             RoadLine(it.id,it.startLat,it.startLon,it.endLat,it.endLon,it.reviewed)
         }
         roadIndex = RoadSpatialIndex(roadLines)
+        receiveActiveNavigationIntent(intent)
         stableMatcher.reset()
         topologyGate.reset(roadPack?.routeGraph)
         stableMatch=null
@@ -655,6 +851,19 @@ class MainActivity : Activity(), LocationListener {
     }
     override fun onStart() { super.onStart(); mapView.onStart() }
     override fun onPause() {
+        // Clear location confidence when leaving the foreground.
+        val nav=activeNavigation
+        val generation=navGeneration
+        if(nav!=null) navWorker.execute {
+            val result=nav.suspendForUncertainGps()
+            runOnUiThread {
+                if(generation==navGeneration && activeNavigation===nav &&
+                    !isDestroyed) {
+                    navUpdate=result
+                    showNavigationState()
+                }
+            }
+        }
         labelSampler?.stop()
         handler.removeCallbacks(tick); locationManager.removeUpdates(this)
         stableMatcher.reset()
@@ -666,6 +875,7 @@ class MainActivity : Activity(), LocationListener {
     override fun onDestroy() {
         labelSampler?.stop()
         currentStyleEpoch++
+        navWorker.shutdownNow()
         mapWorker.shutdownNow()
         map?.removeAnnotations(signMarkers)
         signMarkers.clear()
