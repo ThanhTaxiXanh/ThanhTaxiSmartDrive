@@ -24,6 +24,7 @@ Section **XXI** further requires a PRD, technical architecture, data model, wire
 | [SDK-AND-LICENSES](SDK-AND-LICENSES.md) | Installed dependency versions, SDK adoption decisions, permission/license risk | Official SDK/license URLs |
 | [ADRS](ADRS.md) | Decision log with trade-offs and rejected shortcuts | ADR-001 through ADR-007 |
 | [RISK-AND-TEST-GATES](RISK-AND-TEST-GATES.md) | Risk register, evidence levels, gate for moving into Phase 2 | Named blockers and reproducible checks |
+| [SKILL-REVIEW](SKILL-REVIEW.md) | Starter kit source-by-source audit and corrections | Reviewed source files and adopted/rejected rules |
 | [REQUIREMENTS.csv](REQUIREMENTS.csv) | Machine-checkable source/phase/owner/state/platform matrix | `tools/phase1_check.py` |
 | [PHASE1-REVIEW.json](PHASE1-REVIEW.json) | Machine-readable audit status + documentation coverage | CI validates required fields and files |
 

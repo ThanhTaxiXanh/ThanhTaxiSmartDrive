@@ -31,7 +31,8 @@
     "docs/phase1/SDK-AND-LICENSES.md",
     "docs/phase1/ADRS.md",
     "docs/phase1/RISK-AND-TEST-GATES.md",
-    "docs/phase1/REQUIREMENTS.csv"
+    "docs/phase1/REQUIREMENTS.csv",
+    "docs/phase1/SKILL-REVIEW.md"
   ],
   "unverified_hardware": [
     "VinFast VF e34 support for installing a custom Android Activity",

@@ -25,6 +25,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Phase 1 architecture and source trace gate
+        run: python3 tools/phase1_check.py
       - name: Validate surveyed CSV import pipeline
         run: python3 -m unittest discover -s tools/tests -v
       - name: Unit tests and APK build
