@@ -172,6 +172,129 @@ class OfflineRouteGraph(
         return null
     }
 
+    /**
+     * Minute-aware modeled arrivals for each directed edge. Uses survey travel
+     * speeds or a clearly labeled DEFAULT MODEL speed, NOT a speed limit.
+     * No waiting in a blocked lane/road is assumed. Cap labels/horizon to
+     * prevent untrusted packs from consuming unlimited CPU.
+     *
+     * Bucketed time-dependent Dijkstra retains alternate arrivals in distinct
+     * minute buckets, rather than incorrectly discarding paths that reach a
+     * junction later just after a temporary restriction ends.
+     */
+    fun routeTimed(start: String, finish: String, vehicle: RoutingVehicle,
+                   departureEpochMs: Long, lane: Int? = null,
+                   defaultModelSpeedKph: Double = 30.0): RoutePlan? {
+        if(start !in nodes || finish !in nodes || departureEpochMs<0 ||
+            !defaultModelSpeedKph.isFinite() || defaultModelSpeedKph !in 5.0..110.0 ||
+            (lane!=null && lane !in 1..12)) return null
+        val original=RouteAccessContext.atVietnamTime(vehicle,departureEpochMs,lane)
+        if(start==finish) return RoutePlan(listOf(start),emptyList(),0.0,original)
+        data class State(val node:String,val incoming:String?,val minuteBucket:Long)
+        data class Entry(val state:State,val epoch:Long)
+        data class Prev(val state:State,val edgeId:String,val enter:Long,
+                        val exit:Long,val speed:Double)
+        val root=State(start,null,departureEpochMs/60_000L)
+        val queue=PriorityQueue(compareBy<Entry> { it.epoch }
+            .thenBy { it.state.node }.thenBy { it.state.incoming?:"" })
+        val best=mutableMapOf(root to departureEpochMs)
+        val previous=HashMap<State,Prev>()
+        queue.add(Entry(root,departureEpochMs))
+        val horizon=12L*60*60*1000
+        var visits=0
+        while(queue.isNotEmpty() && visits<120_000) {
+            val (state,epoch)=queue.poll()
+            if(epoch!=best[state]) continue
+            visits++
+            if(state.node==finish) {
+                val reversedNodes=mutableListOf(state.node)
+                val reversedEdges=mutableListOf<String>()
+                val reversedSegments=mutableListOf<SegmentEta>()
+                var cursor=state
+                while(cursor!=root) {
+                    val p=previous[cursor]?:return null
+                    reversedEdges.add(p.edgeId)
+                    reversedSegments.add(SegmentEta(p.edgeId,p.enter,p.exit,p.speed))
+                    cursor=p.state
+                    reversedNodes.add(cursor.node)
+                }
+                val edges=reversedEdges.asReversed()
+                val total=edges.sumOf { edgesById.getValue(it).metres }
+                return RoutePlan(reversedNodes.asReversed(),edges,total,original,
+                    reversedSegments.asReversed())
+            }
+            for(edge in outgoing[state.node].orEmpty()) {
+                val speed=edge.assumedSpeedKph?:defaultModelSpeedKph
+                val travelMs=kotlin.math.ceil(edge.metres*3_600_000.0/
+                    (speed*1000.0)).toLong().coerceAtLeast(1)
+                if(travelMs>horizon || epoch>Long.MAX_VALUE-travelMs) continue
+                val exit=epoch+travelMs
+                if(exit<departureEpochMs || exit-departureEpochMs>horizon) continue
+                if(state.incoming!=null &&
+                    !hasReviewedTurn(state.incoming,edge.id,
+                        RouteAccessContext.atVietnamTime(vehicle,epoch,lane))) continue
+                if(!isEdgeAvailableDuring(edge.id,vehicle,lane,epoch,exit)) continue
+                val next=State(edge.to,edge.id,exit/60_000L)
+                if(exit<(best[next]?:Long.MAX_VALUE)) {
+                    best[next]=exit
+                    previous[next]=Prev(state,edge.id,epoch,exit,speed)
+                    queue.add(Entry(next,exit))
+                }
+            }
+        }
+        return null
+    }
+
+    /** Includes every crossed local-minute boundary, not just edge endpoints. */
+    fun isEdgeAvailableDuring(edgeId:String,vehicle:RoutingVehicle,lane:Int?,
+                              enterMs:Long,exitMs:Long):Boolean {
+        if(enterMs<0 || exitMs<=enterMs || exitMs-enterMs>3_600_000L) return false
+        val edge=edgesById[edgeId]?:return false
+        if(!edge.reviewed)return false
+        val entryCtx=RouteAccessContext.atVietnamTime(vehicle,enterMs,lane)
+        if(!edge.access.permits(entryCtx))return false
+        var boundary=(enterMs/60_000L+1L)*60_000L
+        while(boundary<exitMs) {
+            if(!edge.access.permits(RouteAccessContext.atVietnamTime(vehicle,boundary,lane)))
+                return false
+            boundary+=60_000L
+        }
+        return true
+    }
+
+    /** Validate every modeled arrival before route-preview geometry or voice. */
+    fun isScheduledPlanValid(plan:RoutePlan):Boolean {
+        val context=plan.accessContext?:return false
+        if(plan.schedule.size!=plan.edgeIds.size || plan.edgeIds.isEmpty() ||
+            !isRouteEligibleGeometry(plan))return false
+        var previousExit:Long?=null
+        var total=0.0
+        for((i,s) in plan.schedule.withIndex()) {
+            if(s.edgeId!=plan.edgeIds[i] || !s.modelSpeedKph.isFinite() ||
+                s.modelSpeedKph !in 5.0..110.0 ||
+                (previousExit!=null && previousExit!=s.enterEpochMs))return false
+            if(i>0 && !hasReviewedTurn(plan.edgeIds[i-1],s.edgeId,
+                    RouteAccessContext.atVietnamTime(context.vehicle,s.enterEpochMs,context.lane)))
+                return false
+            if(!isEdgeAvailableDuring(s.edgeId,context.vehicle,context.lane,
+                    s.enterEpochMs,s.exitEpochMs))return false
+            val e=edgesById[s.edgeId]?:return false
+            total+=e.metres
+            previousExit=s.exitEpochMs
+        }
+        return kotlin.math.abs(total-plan.metres)<0.25
+    }
+
+    private fun isRouteEligibleGeometry(plan:RoutePlan):Boolean {
+        if(plan.nodeIds.size!=plan.edgeIds.size+1)return false
+        return plan.edgeIds.indices.all { i ->
+            val edge=edgesById[plan.edgeIds[i]]
+            edge!=null && edge.reviewed && edge.from==plan.nodeIds[i] &&
+                edge.to==plan.nodeIds[i+1] &&
+                (i==0 || (plan.edgeIds[i-1] to edge.id) in allowed)
+        }
+    }
+
     companion object {
         fun haversine(aLat: Double,aLon: Double,bLat: Double,bLon: Double): Double {
             val r = 6371008.8
