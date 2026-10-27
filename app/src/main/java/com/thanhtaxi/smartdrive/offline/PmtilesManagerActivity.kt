@@ -211,6 +211,11 @@ class PmtilesManagerActivity : Activity() {
         root.addView(mapView,LinearLayout.LayoutParams(-1,0,1f))
         setContentView(root)
         mapView.onCreate(state)
+        mapView.addOnDidFailLoadingMapListener { error ->
+            val details=error.take(180)
+            message.text="MapLibre không tải được tile/style: $details. " +
+                "Kiểm tra lớp, zoom và vùng phủ PMTiles."
+        }
         mapView.getMapAsync { m ->
             map=m
         }
@@ -270,9 +275,13 @@ class PmtilesManagerActivity : Activity() {
                     preview.isEnabled=archive.header.isRaster
                     applyDashboard.isEnabled=archive.header.isRaster ||
                         archive.vectorInfo?.previewable==true
-                    message.text="Đã sao chép và xác minh cấu trúc: "+archive.header.formatName+
-                        " · "+archive.file.length()/1024/1024+" MiB. SHA-256: "+archive.sha256+
-                        ". Chưa kiểm tra chất lượng hoặc quyền pháp lý."
+                    message.text="Đã nhập: "+archive.header.formatName+
+                        " · "+archive.file.length()/1024/1024+" MiB; vùng "+
+                        "%.3f, %.3f → %.3f, %.3f".format(java.util.Locale.ROOT,
+                            archive.header.minLat,archive.header.minLon,
+                            archive.header.maxLat,archive.header.maxLon)+
+                        "; zoom "+archive.header.minZoom+"–"+archive.header.maxZoom+
+                        ". Chưa xác minh tile và giấy phép thực tế."
                 }.onFailure { error ->
                     message.text="Không thể nhập PMTiles: "+(error.message ?: "Lỗi đọc tệp")
                 }
@@ -319,14 +328,18 @@ class PmtilesManagerActivity : Activity() {
         try {
             styleReady=false
             m.setStyle(Style.Builder().fromJson(PmtilesVectorStyle.make(
-                archive.tileUri,layer,archive.attribution))) {
+                archive.tileUri,layer,archive.attribution,
+                archive.header.minZoom.coerceAtMost(22),
+                archive.header.maxZoom.coerceAtMost(22)))) {
                 styleReady=true
                 m.cameraPosition=CameraPosition.Builder()
                     .target(LatLng(archive.header.centerLat,archive.header.centerLon))
                     .zoom(archive.header.centerZoom.toDouble().coerceIn(
                         archive.header.minZoom.toDouble(),archive.header.maxZoom.toDouble()))
                     .build()
-                message.text="Đã tải cấu hình vector lớp '$layer'. Kiểm tra đường có hiển thị thực tế, cả khi bật chế độ máy bay. Dữ liệu này chưa dùng để chỉ đường."
+                message.text="Đã tải style vector '$layer' tại zoom ${archive.header.minZoom}–${archive.header.maxZoom}. " +
+                    "Nếu chưa thấy đường, thử pan/zoom trong vùng phủ; lỗi tile sẽ hiển thị tại đây. " +
+                    "Chưa xác nhận dữ liệu định tuyến."
             }
         } catch(e:Exception) {
             message.text="Không mở được MVT: "+(e.message ?: "Lỗi style")

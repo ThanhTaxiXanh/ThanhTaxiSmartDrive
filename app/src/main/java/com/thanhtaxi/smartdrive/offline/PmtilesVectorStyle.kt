@@ -5,13 +5,24 @@ import org.json.JSONObject
 
 /** Minimal offline line rendering from one metadata-declared MVT source layer. */
 object PmtilesVectorStyle {
-    fun make(tileUri: String, layerId: String, attribution: String): String {
+    fun make(
+        tileUri: String,
+        layerId: String,
+        attribution: String,
+        minZoom: Int = 0,
+        maxZoom: Int = 22
+    ): String {
         require(tileUri.startsWith("pmtiles://file:///")) { "Only local app-private PMTiles sources supported" }
         require(Regex("^[A-Za-z0-9_.:-]{1,120}$").matches(layerId)) {
             "Source-layer must be selected from PMTiles metadata"
         }
+        require(minZoom in 0..22 && maxZoom in minZoom..22) {
+            "PMTiles source zoom range not renderable by MapLibre"
+        }
         val roadSource = JSONObject().put("type","vector")
             .put("url",tileUri)
+            .put("minzoom",minZoom)
+            .put("maxzoom",maxZoom)
             .put("attribution",attribution)
         val background = JSONObject().put("id","background")
             .put("type","background")

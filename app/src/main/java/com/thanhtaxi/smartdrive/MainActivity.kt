@@ -328,7 +328,9 @@ class MainActivity : Activity(), LocationListener {
                 try {
                     val selected=archive.header
                     val generatedStyle = if(validVector)
-                        PmtilesVectorStyle.make(archive!!.tileUri,vectorLayer,archive.attribution)
+                        PmtilesVectorStyle.make(archive!!.tileUri,vectorLayer,archive.attribution,
+                            archive.header.minZoom.coerceAtMost(22),
+                            archive.header.maxZoom.coerceAtMost(22))
                         else PmtilesRasterStyle.make(archive!!)
                     m.setStyle(Style.Builder().fromJson(generatedStyle)) {
                         if(epoch!=currentStyleEpoch) return@setStyle

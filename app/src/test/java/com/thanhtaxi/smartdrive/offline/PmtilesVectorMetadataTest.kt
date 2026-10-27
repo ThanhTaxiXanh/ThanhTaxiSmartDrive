@@ -44,6 +44,12 @@ class PmtilesVectorMetadataTest {
             "pmtiles://file:///data/user/0/app/files/roads.pmtiles","roads","© OSM"))
         assertEquals("roads",style.getJSONArray("layers").getJSONObject(1).getString("source-layer"))
         assertEquals("vector",style.getJSONObject("sources").getJSONObject("localRoads").getString("type"))
+        val limited=JSONObject(PmtilesVectorStyle.make(
+            "pmtiles://file:///data/user/0/app/files/roads.pmtiles",
+            "roads","© OSM",minZoom=6,maxZoom=12))
+            .getJSONObject("sources").getJSONObject("localRoads")
+        assertEquals(6,limited.getInt("minzoom"))
+        assertEquals(12,limited.getInt("maxzoom"))
         try {
             PmtilesVectorStyle.make("https://example.org/a.pmtiles","roads","© OSM")
             fail("should not allow remote sources in offline style")
