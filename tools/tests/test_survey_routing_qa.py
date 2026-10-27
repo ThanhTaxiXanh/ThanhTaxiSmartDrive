@@ -34,6 +34,33 @@ class SurveyRoutingQaTests(unittest.TestCase):
         g,r=sample()
         g["allowedTurns"][0]["viaNode"]="C"
         self.assertTrue(errors(g,r))
+    def test_survey_restrictions_on_edges_and_turns(self):
+        g,r=sample()
+        g["edges"][0]["restrictions"]={"allowedVehicles":["TAXI"],
+            "blockedWindows":[{"days":[1,2,3,4,5],"startMinute":420,"endMinute":540}]}
+        g["allowedTurns"][0]["restrictions"]={"allowedVehicles":["TAXI"]}
+        self.assertEqual([],errors(g,r))
+        g["edges"][0]["restrictions"]["blockedWindows"][0]["endMinute"]=420
+        self.assertTrue(errors(g,r))
+        g["edges"][0]["restrictions"]["blockedWindows"][0]["endMinute"]=540
+        g["edges"][0]["restrictions"]["allowedVehicles"]=["TAXI","UNSUPPORTED"]
+        self.assertTrue(errors(g,r))
+
+    def test_restrictions_are_never_silently_accepted_without_provenance(self):
+        g,r=sample()
+        g["allowedTurns"][0]["restrictions"]={"allowedVehicles":["TAXI"]}
+        g["allowedTurns"][0]["sourceRef"]=""
+        self.assertTrue(errors(g,r))
+        g,r=sample()
+        g["edges"][0]["restrictions"]={"brokenKey":"untrusted"}
+        self.assertTrue(errors(g,r))
+        g,r=sample()
+        g["edges"][0]["restrictions"]={"blockedWindows":[
+            {"days":[1,2],"startMinute":1320,"endMinute":120}]}
+        self.assertEqual([],errors(g,r))
+        g["edges"][0]["restrictions"]["blockedWindows"][0]["days"]=[0]
+        self.assertTrue(errors(g,r))
+
     def test_display_name_needs_clean_user_supplied_metadata(self):
         g,r=sample()
         g["nodes"][0]["displayName"]="Bến xe"

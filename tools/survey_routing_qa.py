@@ -21,6 +21,43 @@ def inspect_routing(routing, roads, add):
     if len(nodes)>20000 or len(edges)>40000 or len(turns)>80000:
         add("error","routing","Graph too large")
         return
+    def validate_access(item, identifier):
+        if "restrictions" not in item:
+            return
+        rule=item["restrictions"]
+        if not isinstance(rule,dict) or set(rule)-{"allowedVehicles","blockedWindows"}:
+            add("error",identifier,"restrictions must have known fields only")
+            return
+        if item.get("reviewed") is not True or not isinstance(item.get("sourceRef"),str) or not item["sourceRef"].strip():
+            add("error",identifier,"Conditional restriction needs reviewed=true and sourceRef")
+        vehicles=rule.get("allowedVehicles")
+        windows=rule.get("blockedWindows")
+        if vehicles is None and windows is None:
+            add("error",identifier,"Empty restrictions cannot carry a rule")
+        if vehicles is not None:
+            known={"TAXI","CAR","MOTORBIKE","BUS","TRUCK","OTHER"}
+            if (not isinstance(vehicles,list) or not vehicles or len(vehicles)>6 or
+                any(not isinstance(x,str) or x not in known for x in vehicles) or
+                len(set(str(x) for x in vehicles))!=len(vehicles)):
+                add("error",identifier,"Invalid allowedVehicles rule")
+        if windows is not None:
+            if not isinstance(windows,list) or not 1<=len(windows)<=32:
+                add("error",identifier,"blockedWindows must have 1 to 32 records")
+            else:
+                for w in windows:
+                    if not isinstance(w,dict) or set(w)!={"days","startMinute","endMinute"}:
+                        add("error",identifier,"Invalid closure window fields")
+                        continue
+                    days=w.get("days")
+                    if (not isinstance(days,list) or not 1<=len(days)<=7 or
+                        any(type(d) is not int or d not in range(1,8) for d in days) or
+                        len(set(str(x) for x in days))!=len(days)):
+                        add("error",identifier,"Invalid ISO weekdays in closure")
+                    start=w.get("startMinute");end=w.get("endMinute")
+                    if (type(start) is not int or type(end) is not int or
+                        start not in range(1440) or end not in range(1440) or start==end):
+                        add("error",identifier,"Invalid closure minute range")
+
     ns={};es={}
     for n in nodes:
         if not isinstance(n,dict):
@@ -52,6 +89,7 @@ def inspect_routing(routing, roads, add):
             add("error","edge","Duplicate/missing edge ID")
             continue
         es[ident]=e
+        validate_access(e,ident)
         a,b=e.get("fromNode"),e.get("toNode")
         segmentId=e.get("segmentId")
         segment=roads.get(segmentId) if isinstance(segmentId,str) else None
@@ -90,6 +128,7 @@ def inspect_routing(routing, roads, add):
         if ident in seen:
             add("error","turn","Duplicate directed turn")
         seen.add(ident)
+        validate_access(t,"turn-"+ident[0]+"-"+ident[2])
         before=es.get(src) if isinstance(src,str) else None
         after=es.get(dst) if isinstance(dst,str) else None
         if before is None or after is None or not isinstance(via,str) or via not in ns or (
