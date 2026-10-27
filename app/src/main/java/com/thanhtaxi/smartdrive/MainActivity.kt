@@ -63,6 +63,7 @@ class MainActivity : Activity(), LocationListener {
     private var map: MapLibreMap? = null
     private lateinit var speedLabel: TextView
     private lateinit var limitLabel: TextView
+    private lateinit var pipTrustLabel: TextView
     private lateinit var gpsLabel: TextView
     private lateinit var signLabel: TextView
     private lateinit var mediaLabel: TextView
@@ -116,10 +117,15 @@ class MainActivity : Activity(), LocationListener {
         this.text = text; textSize = size; setTextColor(Color.WHITE); setPadding(14, 10, 14, 8)
     }
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
-    private fun limitCircle(hasValue: Boolean) = GradientDrawable().apply {
+    private fun limitCircle(trust: SpeedPipTrust) = GradientDrawable().apply {
         shape = GradientDrawable.OVAL
-        setColor(if (hasValue) Color.WHITE else Color.rgb(42, 50, 57))
-        setStroke(dp(5), if (hasValue) Color.RED else Color.GRAY)
+        setColor(if (trust == SpeedPipTrust.AUTHENTICATED) Color.WHITE else Color.rgb(42, 50, 57))
+        setStroke(dp(5), when(trust) {
+            SpeedPipTrust.AUTHENTICATED -> Color.RED
+            SpeedPipTrust.SURVEY_ONLY, SpeedPipTrust.ESTIMATED -> Color.rgb(255,183,75)
+            SpeedPipTrust.CONFLICT -> Color.rgb(220,91,66)
+            SpeedPipTrust.UNKNOWN -> Color.GRAY
+        })
     }
     private fun positionIcon(): Icon {
         vehicleIcon?.let { return it }
@@ -221,7 +227,7 @@ class MainActivity : Activity(), LocationListener {
             setTypeface(null, Typeface.BOLD)
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
-            background = limitCircle(false)
+            background = limitCircle(SpeedPipTrust.UNKNOWN)
             setPadding(0,0,0,0)
         }
         speedRow.addView(speedLabel)
@@ -229,6 +235,12 @@ class MainActivity : Activity(), LocationListener {
             leftMargin = dp(10)
         })
         info.addView(speedRow)
+        pipTrustLabel = label("KHÔNG ĐỦ DỮ LIỆU", 13f).apply {
+            setTypeface(null,Typeface.BOLD)
+            setTextColor(Color.LTGRAY)
+            maxLines=2
+        }
+        info.addView(pipTrustLabel)
         gpsLabel = label("Đang chờ tín hiệu GPS", 14f); info.addView(gpsLabel)
         signLabel = label("Giới hạn: Chưa xác minh", 13f).apply {
             maxLines = 3
@@ -502,22 +514,33 @@ class MainActivity : Activity(), LocationListener {
             LimitResult(null, LimitStatus.CONFLICT, "traffic-signs", "Biển báo cùng vị trí mâu thuẫn")
         else engine.resolve(context, pack?.signs.orEmpty() + listOfNotNull(decision.speedEvidence), now)
         val level = compliance.grade(SpeedObservation(speed, speedReliable), limit, prefs.getInt("tolerance",3))
+        val pip = SpeedPipPolicy.present(limit,level)
         speedLabel.text = if (speed == null) "-- km/h" else "${speed.toInt()} km/h"
-        limitLabel.text = limit.kph?.toString() ?: "--"
-        limitLabel.background = limitCircle(limit.kph != null)
+        limitLabel.text = pip.value
+        limitLabel.background = limitCircle(pip.trust)
+        pipTrustLabel.text = pip.badge
+        pipTrustLabel.setTextColor(when(pip.trust) {
+            SpeedPipTrust.AUTHENTICATED -> Color.GREEN
+            SpeedPipTrust.SURVEY_ONLY,SpeedPipTrust.ESTIMATED -> Color.rgb(255,196,85)
+            SpeedPipTrust.CONFLICT -> Color.rgb(255,124,103)
+            SpeedPipTrust.UNKNOWN -> Color.LTGRAY
+        })
+        limitLabel.contentDescription = "Giới hạn: ${pip.value} km/h, ${pip.badge}"
+        pipTrustLabel.contentDescription = "${pip.badge}. ${pip.detail}"
         val next = decision.upcoming.joinToString(" • ") {
             val code = when(it.kind) { SignKind.R_420 -> "R.420"; SignKind.R_421 -> "R.421";
                 SignKind.P_127 -> "P.127 ${it.kph ?: "--"}"; SignKind.END_SPEED -> "Hết hạn chế" }
             "${it.metres}m: $code"
         }
         val evidenceLabel = when (limit.status) {
-            LimitStatus.VERIFIED -> "Theo gói khảo sát (CHƯA kiểm chứng độc lập)"
+            LimitStatus.VERIFIED -> "Theo nguồn đã xác thực"
+            LimitStatus.SURVEY_REPORTED -> "Dữ liệu khảo sát người dùng, CHƯA kiểm chứng độc lập"
             LimitStatus.ESTIMATED_FROM_LAW -> "Ước tính mặc định; xem biển thực tế"
             LimitStatus.CONFLICT -> "Dữ liệu mâu thuẫn, không được suy đoán"
             LimitStatus.UNKNOWN -> "Chưa đủ cơ sở xác định"
         }
-        signLabel.text = (if (limit.kph == null) "Giới hạn: -- ($evidenceLabel)"
-            else "$evidenceLabel: ${limit.note}") +
+        signLabel.text = (if (pip.value == "--") "Giới hạn: -- ($evidenceLabel)"
+            else "$evidenceLabel: ${pip.detail}") +
             if (next.isNotBlank()) "\nSắp tới: $next" else ""
         gpsLabel.text = when {
             !fresh -> "Mất GPS / tín hiệu cũ"
@@ -529,11 +552,19 @@ class MainActivity : Activity(), LocationListener {
             segment == null -> "GPS tốt • Chưa có đoạn đường được xác minh"
             else -> "GPS: ${loc!!.accuracy.toInt()}m • Đoạn: ${segment.id}"
         }
-        limitLabel.setTextColor(if (limit.kph != null) Color.BLACK else Color.WHITE)
-        speedLabel.setTextColor(if (level == SpeedSeverity.OVER || level == SpeedSeverity.SERIOUS)
-            Color.RED else Color.WHITE)
-        if (prefs.getBoolean("soundAlert", false) &&
-            alertDebouncer.shouldAlert(level, SystemClock.elapsedRealtime())) {
+        limitLabel.setTextColor(if (pip.trust == SpeedPipTrust.AUTHENTICATED)
+            Color.BLACK else Color.WHITE)
+        val over = level == SpeedSeverity.OVER || level == SpeedSeverity.SERIOUS
+        speedLabel.setTextColor(when {
+            !over -> Color.WHITE
+            pip.trust == SpeedPipTrust.AUTHENTICATED -> Color.RED
+            pip.trust == SpeedPipTrust.SURVEY_ONLY ||
+                pip.trust == SpeedPipTrust.ESTIMATED -> Color.rgb(255,196,85)
+            else -> Color.WHITE
+        })
+        val toneGrade = if (pip.soundEligible && prefs.getBoolean("soundAlert", false))
+            level else SpeedSeverity.UNKNOWN
+        if (alertDebouncer.shouldAlert(toneGrade, SystemClock.elapsedRealtime())) {
             try {
                 if (tone == null) tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 55)
                 tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
