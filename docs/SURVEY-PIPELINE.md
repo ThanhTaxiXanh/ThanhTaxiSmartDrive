@@ -62,3 +62,10 @@ CI chạy lệnh này trước khi unit test Kotlin và build APK.
 5. Thử nghiệm đường thực tại Bắc Giang–Bắc Ninh, lưu biên bản QA.
 
 Hiện tại **chưa có ký số hoặc nhà phát hành dữ liệu được ủy quyền**.
+
+## Kiểm tra độc lập cấu trúc sau khi tạo gói
+
+Chạy `python3 -m tools.survey_qa --pack pilot.json --report qa.json` để rà
+soát ID, `sourceRef`, tốc độ P.127 và các biển gần nhau có thể mâu
+thuẫn. Xem [SURVEY-QA.md](SURVEY-QA.md). Báo cáo qua QA cấu trúc **không**
+đồng nghĩa thông qua QA pháp lý hoặc thực địa.

@@ -34,6 +34,7 @@ The application is not a substitute for visual observation of signs and road con
 - [x] Directed graph Dijkstra with explicit allowlisted turns and unit tests
 - [x] Parked-only route preview over MapLibre and routing JSON importer
 - [x] Deterministic source-ref CSV pack builder + Python test gate in CI
+- [x] Structural sign QA CLI for missing provenance and nearby conflicts (not legal verification)
 - [ ] Source verification signatures, national coverage, routing with restrictions
 - [x] PMTiles v3 importer and raster preview source; [ ] device-proven offline rendering and vector/MBTiles adapters
 - [ ] Android Auto Navigation template and live device driving safety QA

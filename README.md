@@ -26,6 +26,7 @@ Dự án mã nguồn **Thanh Taxi Smart Drive** dành cho tài xế Việt Nam.
 - [Định dạng dữ liệu đường](docs/ROAD-PACK.md)
 - [Đồ thị và xem trước định tuyến offline](docs/ROUTING.md)
 - [Nhập CSV khảo sát, kiểm tra nguồn](docs/SURVEY-PIPELINE.md)
+- [Báo cáo lỗi/biển báo mâu thuẫn](docs/SURVEY-QA.md)
 - [Nhập PMTiles v3 và checklist kiểm thử offline](docs/PMTILES-DESIGN.md)
 
 ## Cảnh báo

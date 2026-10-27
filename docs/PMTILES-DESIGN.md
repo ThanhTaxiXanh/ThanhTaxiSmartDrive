@@ -15,6 +15,7 @@ Bản alpha có:
   offsets/lengths, dạng tile, zoom và bounding box; giới hạn 1 GiB
 - sao chép vào kho app theo tên SHA-256; có thể nhập expected SHA-256
   nhà phát hành cung cấp và kiểm tra trước khi nhận
+- có thao tác xóa bản sao PMTiles đang chọn khỏi thư mục riêng
 - đọc lại SHA-256 khi mở gói; phát hiện dữ liệu bị hỏng/sửa đổi
 - với PMTiles raster PNG/JPEG/WebP: dựng style JSON local qua
   `Style.Builder().fromJson`, nguồn `pmtiles://file:///...`,
@@ -51,3 +52,16 @@ Gói AVIF/MLT cũng chưa có preview. MBTiles chưa có importer.
 - [ ] Kiểm thử Android head unit thật và nhiệt/CPU/bộ nhớ
 
 Thông tin kỹ thuật: <https://github.com/protomaps/PMTiles/blob/main/spec/v3/spec.md>
+
+## Phiếu kiểm thử offline trong ứng dụng
+
+Màn hình nhập PMTiles có thêm phiếu kiểm tra dùng khi xe đỗ. Sau khi mở raster
+và nhìn bằng mắt, người dùng cần tự xác nhận: tile hiển thị khi không có
+mạng hoạt động, đã thử ít nhất hai mức zoom và đã thử sau khi khởi động
+lại ứng dụng. Ứng dụng yêu cầu tại thời điểm ghi phiếu **không có active
+network**. Phiếu JSON được lưu riêng và có thể xuất qua Android
+Storage Access Framework.
+
+Trạng thái `READY_FOR_HUMAN_REVIEW` chỉ là **báo cáo người dùng tự khai**,
+không phải kiểm chứng tile-level tự động, không chứng minh đã bật chế độ
+máy bay hay ảnh bản đồ/biển báo chính xác.
