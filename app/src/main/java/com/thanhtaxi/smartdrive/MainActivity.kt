@@ -548,6 +548,21 @@ class MainActivity : Activity(), LocationListener {
     private fun refreshData() {
         val loc = lastLocation
         val fresh = loc != null && SystemClock.elapsedRealtime()-lastFixElapsedMs < 8000L
+        if(!fresh && activeNavigation!=null &&
+            navUpdate.phase!=NavigationPhase.GPS_UNCERTAIN &&
+            navUpdate.phase!=NavigationPhase.ARRIVED) {
+            val engine=activeNavigation
+            val epoch=navGeneration
+            if(engine!=null) navWorker.execute {
+                val result=engine.suspendForUncertainGps()
+                runOnUiThread {
+                    if(epoch==navGeneration && activeNavigation===engine && !isDestroyed) {
+                        navUpdate=result
+                        showNavigationState()
+                    }
+                }
+            }
+        }
         val accurate = fresh && loc != null && loc.hasAccuracy() && loc.accuracy <= 20f
         val speedReliable = accurate && loc != null && loc.hasSpeed() &&
             (!loc.hasSpeedAccuracy() || loc.speedAccuracyMetersPerSecond <= 2.5f)
