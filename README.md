@@ -97,3 +97,23 @@ hoặc hệ thống chỉ dẫn/giới hạn tốc độ đã xác nhận.
   cùng đoạn đường, không tính các lần refresh giao diện là GPS mới. Nếu
   GPS mất, nhảy xa hoặc đổi đột ngột đường thì hủy kết quả cho tới khi
   xác nhận lại. Giới hạn tốc độ vẫn không được xem là chứng nhận pháp lý.
+
+## Nhãn tên đường offline (Android native overlay)
+
+Từ bản cập nhật này, trên PMTiles MVT vector đã chọn lớp chứa đường, ứng dụng
+có thể hiển thị tối đa **9 nhãn tên/mã tuyến trong khung bản đồ**, lấy trực
+tiếp từ thuộc tính feature của các line đã render (ưu tiên `name:vi`,
+`name`, sau đó `ref`). Nhãn được Android Canvas vẽ bằng font hệ thống,
+**không cần tải glyph từ mạng và không chứa file font tải ngoài**.
+Lớp nhãn sẽ bị bỏ trống khi PMTiles không có tên hoặc lớp vừa chọn chưa
+hiển thị line. Khi xe đang đỗ, vẫn có thể chạm đường để tra tên chi tiết.
+
+Bạn có thể bật/tắt tính năng ở **Cài đặt → Hiển thị tên/mã tuyến offline**.
+Đây là nhãn hiển thị thử nghiệm lấy mẫu điểm trên màn hình, không phải
+cartography label dọc toàn đường và không bảo đảm tên đường chính xác.
+Nhãn và thẻ OSM **không** làm bằng chứng xác minh biển báo hay tốc độ.
+
+Khi có road pack khảo sát và `routing.allowedTurns`, sự chuyển đoạn GPS
+cũng phải khớp với một lượt rẽ được đánh dấu `reviewed` trong đồ thị.
+Ứng dụng không tự coi hai đoạn có hình học giao nhau là nối được.
+Thiếu dữ liệu topology sẽ hiện `--` hoặc chưa xác định, không suy đoán.

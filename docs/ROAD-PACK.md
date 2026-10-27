@@ -93,3 +93,13 @@ không tự động được coi là giao lộ có thể chuyển hướng.
 Muốn tạo JSON từ CSV khảo sát có kiểm tra nguồn, xem
 [SURVEY-PIPELINE.md](SURVEY-PIPELINE.md). Công cụ CSV mặc định không đánh dấu
 bất kỳ đoạn/biển nào là đã duyệt.
+
+## Chặn đối sánh đường không liên thông
+
+Ngoài yêu cầu ba mẫu GPS liên tiếp, khi road pack có đối tượng `routing`,
+bộ `RoadTopologyGate` từ chối chuyển từ segment đang được nhận diện sang
+segment khác nếu không tìm thấy một `allowedTurns` đã khảo sát/đánh dấu
+`reviewed` giữa hai cạnh có hướng tương ứng. Không có routing graph thì
+cơ chế ba mẫu GPS vẫn hoạt động và app *không được tuyên bố* đã xác minh
+topology. Đây chỉ là bộ lọc thận trọng; chưa hỗ trợ một bản đồ toàn tuyến,
+phân làn/đường trên cao hay kết nối qua nhiều node trong lúc mất GPS.

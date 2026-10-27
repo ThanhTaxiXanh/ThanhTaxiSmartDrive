@@ -170,3 +170,19 @@ chữ/glyph và style đã kiểm tra phù hợp. Dữ liệu do người dùng 
 thể thiếu thuộc tính hoặc có lỗi chính tả; vẫn cần kiểm chứng khi lái xe.
 
 Tài liệu API: https://maplibre.org/maplibre-native/android/api/-map-libre%20-native%20-android/org.maplibre.android.maps/-map-libre-map/query-rendered-features.html
+
+## Lớp nhãn offline không dùng glyph (pilot)
+
+Nhãn hiển thị dùng Android `Paint` và font sans-serif trong hệ thống Android,
+đè trên `MapView` của Dashboard và màn hình preview. Bộ lấy mẫu hỏi
+`queryRenderedFeatures` tối đa **20 điểm** sau lúc camera idle, chỉ trên
+layer `road-lines`; sau đó lọc tên/mã, trùng nhau và khoảng cách giữa nhãn,
+tối đa **9 nhãn** một lúc. Do lấy mẫu rời rạc, có thể thiếu tên trên đường
+rất nhỏ hoặc lớp chưa nạp tile. Không cần URL font/glyph hoặc tệp font
+riêng khi offline. Android-native overlay không phải Style SymbolLayer
+và nhãn chưa được xoay theo hình học tuyến, không thích hợp để coi là
+cartography hoàn chỉnh.
+
+Ở Cài đặt có tùy chọn bật/tắt nhãn offline. RoadFeatureSummary chỉ dùng
+`name:vi`, `name`, `official_name`, `ref`, `int_ref`, `name_en`
+trong feature; không dùng `maxspeed` để xác định luật tốc độ.

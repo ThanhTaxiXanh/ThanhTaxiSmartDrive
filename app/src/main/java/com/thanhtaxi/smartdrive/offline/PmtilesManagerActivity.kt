@@ -473,7 +473,12 @@ class PmtilesManagerActivity : Activity() {
         } catch(e:Exception) { message.text="Không ghi được báo cáo: "+e.message }
     }
     override fun onStart(){super.onStart();if(::mapView.isInitialized)mapView.onStart()}
-    override fun onResume(){super.onResume();if(::mapView.isInitialized)mapView.onResume()}
+    override fun onResume(){
+        super.onResume()
+        if(::mapView.isInitialized)mapView.onResume()
+        if(::namesCheck.isInitialized && loaded?.header?.tileType==1 && styleReady)
+            nameSampler?.setEnabled(namesCheck.isChecked)
+    }
     override fun onPause(){
         nameSampler?.stop()
         if(::mapView.isInitialized)mapView.onPause()

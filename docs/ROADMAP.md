@@ -49,3 +49,7 @@ The application is not a substitute for visual observation of signs and road con
 - [x] Read per-layer PMTiles field names; on-tap parked road name/ref inspection (not overlaid font labels)
 - [x] StableRoadMatcher three distinct consecutive GPS fixes for reviewed segment recognition
 - [ ] Device-tested offline glyph/labels & PMTiles street style, actual field road segments and legal sign validation
+
+- [x] Road-name Canvas overlay (system font, zero network glyphs), bounded 20 sample points, 9 labels
+- [x] Strict segment transition gate from reviewed routing allowedTurns (when graph exists)
+- [ ] Complete offline vector label placement from geometry, automatic hierarchy/typography, actual road packs, on-device QA
