@@ -211,7 +211,8 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
             }
             val destination=plan.nodeIds.last()
             val (lookup, candidate)=SurveyReroutePreview.candidate(
-                graph,fix.lat,fix.lon,destination,context=plan.accessContext)
+                graph,fix.lat,fix.lon,destination,context=plan.accessContext,
+                departureEpochMs=if(plan.schedule.isNotEmpty())nowEpochMs else null)
             // Never auto-switch to a candidate or emit a turn instruction.
             proposal=candidate?.takeIf { it.edgeIds.isNotEmpty() && it.edgeIds!=plan.edgeIds }
             last=NavigationUpdate(NavigationPhase.OFF_ROUTE,
@@ -230,6 +231,10 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
         if(oldProgress!=null && travelled<oldProgress-35.0)
             return suspendForUncertainGps()
         val progress=max(oldProgress?:0.0,travelled).coerceAtMost(plan.metres)
+        if(plan.schedule.isNotEmpty() &&
+            (nowEpochMs==null || !graph.remainingSchedulePermits(
+                plan,chosen.index,chosen.progress,nowEpochMs)))
+            return suspendForUncertainGps()
         lastProgressMeters=progress
         lastEdgeIndex=chosen.index
         offRouteStreak=0

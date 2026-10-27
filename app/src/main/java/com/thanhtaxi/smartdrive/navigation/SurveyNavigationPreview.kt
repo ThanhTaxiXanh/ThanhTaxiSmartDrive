@@ -171,11 +171,15 @@ class RouteDeviationMonitor(
 object SurveyReroutePreview {
     fun candidate(graph: OfflineRouteGraph, lat: Double,lon:Double,destinationId:String,
                   radiusMeters:Double=100.0,
-                  context:RouteAccessContext?=null): Pair<SurveyLookup, RoutePlan?> {
+                  context:RouteAccessContext?=null,
+                  departureEpochMs:Long?=null): Pair<SurveyLookup, RoutePlan?> {
         val q="${lat},${lon}"
         val located=SurveyPointSearch.resolve(graph,q,radiusMeters)
         val id=located.nodeId ?:return located to null
-        if(id==destinationId) return located to graph.route(id,id,context)
-        return located to graph.route(id,destinationId,context)
+        val plan=if(departureEpochMs!=null && context!=null &&
+            departureEpochMs>=0) graph.routeTimed(id,destinationId,
+                context.vehicle,departureEpochMs,context.lane)
+            else graph.route(id,destinationId,context)
+        return located to plan
     }
 }
