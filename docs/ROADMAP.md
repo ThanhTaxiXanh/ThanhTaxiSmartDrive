@@ -45,3 +45,7 @@ The application is not a substitute for visual observation of signs and road con
 - [x] Follow/recenter camera control and PMTiles vector declared source zoom
 - [x] Root directory range/varint checks for PMTiles with none/GZIP compression
 - [ ] Real device archive validation, complete glyphs/labels and map source schema QA
+
+- [x] Read per-layer PMTiles field names; on-tap parked road name/ref inspection (not overlaid font labels)
+- [x] StableRoadMatcher three distinct consecutive GPS fixes for reviewed segment recognition
+- [ ] Device-tested offline glyph/labels & PMTiles street style, actual field road segments and legal sign validation

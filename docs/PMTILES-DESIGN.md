@@ -153,3 +153,20 @@ Tham khảo:
 
 Dữ liệu OSM đường phố không tự xác nhận giới hạn tốc độ, biển cấm, một chiều
 hoặc tính hợp lệ của tuyến.
+
+## Xem tên/mã tuyến lấy từ PMTiles vector (bản mới)
+
+Sau khi chọn `source-layer` có đường, màn hình sẽ liệt kê **tên thuộc tính
+khai báo từ TileJSON** trong `vector_layers[].fields`, ví dụ `name:vi`,
+`name` hay `ref` nếu nguồn thực sự có các trường đó. Khi xe đã đỗ,
+chạm lên đường trên bản xem trước hoặc Dashboard để lấy các thuộc tính
+trên feature được MapLibre vẽ (queryRenderedFeatures).
+
+Không phỏng đoán tên đường nếu tile không chứa tên. `maxspeed` (nếu có)
+không được tự suy diễn thành giới hạn tốc độ hợp pháp hoặc yêu cầu cảnh báo.
+Kết quả được hiển thị riêng trong khung thông tin, **không phải tên đường
+được vẽ thành chữ trên nền bản đồ**: nhãn MapLibre offline còn cần phông
+chữ/glyph và style đã kiểm tra phù hợp. Dữ liệu do người dùng cung cấp có
+thể thiếu thuộc tính hoặc có lỗi chính tả; vẫn cần kiểm chứng khi lái xe.
+
+Tài liệu API: https://maplibre.org/maplibre-native/android/api/-map-libre%20-native%20-android/org.maplibre.android.maps/-map-libre-map/query-rendered-features.html

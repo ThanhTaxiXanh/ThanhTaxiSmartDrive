@@ -81,3 +81,19 @@ Nguồn dữ liệu và giấy phép phải do người sử dụng kiểm tra.
 
 Bản đồ mẫu chỉ để kiểm thử; ứng dụng vẫn chưa phải Android Auto chính thức
 hoặc hệ thống chỉ dẫn/giới hạn tốc độ đã xác nhận.
+
+## Truy vấn tên đường PMTiles và xác nhận GPS (alpha)
+
+- Với PMTiles **MVT Vector**, màn hình Cài đặt → Nhập PMTiles hiển thị tên các
+  `source-layer` và tên trường thuộc tính được khai báo trong metadata. Khi
+  đang đỗ xe, chạm trực tiếp vào nét đường trên preview để xem tên (ưu tiên
+  `name:vi` / `name`) hoặc mã tuyến (ví dụ `ref`) được chứa trong tile.
+- Khi đỗ xe, tính năng tương tự có ở Dashboard đang sử dụng PMTiles vector.
+  Nếu không có tên/mã trong dữ liệu OSM, ứng dụng không tự dựng tên đường.
+- Không tải font/glyph online chỉ để dán nhãn lên bản đồ PMTiles offline;
+  việc hiển thị trực tiếp nhãn dọc đường trên bản đồ vẫn chưa hoàn thiện.
+- Với dữ liệu khảo sát đã đánh dấu `reviewed` và có nguồn, hệ thống chỉ
+  sử dụng một kết quả đối sánh GPS sau **ba mẫu GPS mới liên tiếp** khớp
+  cùng đoạn đường, không tính các lần refresh giao diện là GPS mới. Nếu
+  GPS mất, nhảy xa hoặc đổi đột ngột đường thì hủy kết quả cho tới khi
+  xác nhận lại. Giới hạn tốc độ vẫn không được xem là chứng nhận pháp lý.
