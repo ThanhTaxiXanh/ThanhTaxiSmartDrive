@@ -73,12 +73,12 @@ class TimedRoutingTest {
 
     @Test fun modeledSpeedChangesEntryTimeAndCanChangeSelectedRoute() {
         val speedG=OfflineRouteGraph(nodes,edges.map { if(it.id=="ab")
-            it.copy(assumedSpeedKph=5.0) else it },turns)
+            it.copy(assumedSpeedKph=20.0) else it },turns)
         // At 08:59:50, the second edge opens at 09:00; a slow first edge
         // delays arrival sufficiently to make short route available.
         val route=speedG.routeTimed("A","C",RoutingVehicle.TAXI,time(8,59,50))!!
         assertEquals(listOf("ab","bc"),route.edgeIds)
-        assertEquals(5.0,route.schedule.first().modelSpeedKph,0.01)
+        assertEquals(20.0,route.schedule.first().modelSpeedKph,0.01)
         assertTrue(route.schedule[0].exitEpochMs>time(9,0,0))
     }
 
