@@ -2,6 +2,7 @@ package com.thanhtaxi.smartdrive.data
 
 import android.content.Context
 import com.thanhtaxi.smartdrive.domain.*
+import com.thanhtaxi.smartdrive.navigation.*
 import org.json.JSONObject
 import java.io.File
 import kotlin.math.*
@@ -14,7 +15,8 @@ data class RoadPack(
     val title: String, val source: String, val license: String,
     val series: String, val version: Long,
     val segments: List<Segment>, val signs: List<SpeedEvidence>,
-    val trafficSigns: List<LocatedRoadSign> = emptyList()
+    val trafficSigns: List<LocatedRoadSign> = emptyList(),
+    val routeGraph: OfflineRouteGraph? = null
 )
 
 /**
@@ -163,6 +165,58 @@ class RoadPackRepository(private val context: Context) {
             )
         }
         require(located.distinctBy { it.id }.size == located.size) { "Trùng mã ID biển báo" }
-        return RoadPack(title, source, license, series, version, segments, signs, located)
+        val routing = root.optJSONObject("routing")
+        val graph = if (routing == null) null else {
+            val points = routing.getJSONArray("nodes")
+            val links = routing.getJSONArray("edges")
+            val approvedTurns = routing.getJSONArray("allowedTurns")
+            require(points.length() <= 20000 && links.length() <= 40000 &&
+                approvedTurns.length() <= 80000) { "Gói định tuyến vượt giới hạn" }
+            val graphNodes = (0 until points.length()).map { i ->
+                val item = points.getJSONObject(i)
+                RouteNode(item.getString("id").trim(), item.getDouble("lat"),item.getDouble("lon"))
+            }
+            val nodeMap = graphNodes.associateBy { it.id }
+            val graphEdges = (0 until links.length()).map { i ->
+                val item = links.getJSONObject(i)
+                val road = requireNotNull(roads[item.getString("segmentId")]) { "Đoạn đường định tuyến không tồn tại" }
+                val start = requireNotNull(nodeMap[item.getString("fromNode")]) { "Thiếu điểm đầu" }
+                val end = requireNotNull(nodeMap[item.getString("toNode")]) { "Thiếu điểm cuối" }
+                val reversed = when(item.getString("direction")) {
+                    "forward" -> false
+                    "reverse" -> true
+                    else -> throw IllegalArgumentException("Hướng routing edge phải là forward hoặc reverse")
+                }
+                val firstLat = if(reversed) road.endLat else road.startLat
+                val firstLon = if(reversed) road.endLon else road.startLon
+                val lastLat = if(reversed) road.startLat else road.endLat
+                val lastLon = if(reversed) road.startLon else road.endLon
+                require(OfflineRouteGraph.haversine(start.lat,start.lon,firstLat,firstLon) <= 8.0 &&
+                    OfflineRouteGraph.haversine(end.lat,end.lon,lastLat,lastLon) <= 8.0) {
+                    "Đỉnh routing phải trùng các đầu mút đoạn đường"
+                }
+                val metres = item.getDouble("distanceMeters")
+                val direct = OfflineRouteGraph.haversine(start.lat,start.lon,end.lat,end.lon)
+                require(direct > 2.0 && metres.isFinite() && metres >= direct*0.9 &&
+                    metres <= direct*1.5) { "Chiều dài định tuyến bất thường" }
+                val accepted = item.optBoolean("reviewed",false)
+                if (accepted) require(item.optString("sourceRef").isNotBlank()) {
+                    "Đoạn routing đã duyệt cần sourceRef khảo sát"
+                }
+                RouteEdge(item.getString("id").trim(),start.id,end.id,road.id,metres,
+                    accepted && road.reviewed)
+            }
+            val turns = (0 until approvedTurns.length()).map { i ->
+                val item = approvedTurns.getJSONObject(i)
+                val accepted = item.optBoolean("reviewed",false)
+                if (accepted) require(item.optString("sourceRef").isNotBlank()) {
+                    "Chuyển hướng đã duyệt cần sourceRef khảo sát"
+                }
+                AllowedTurn(item.getString("fromEdge"),item.getString("viaNode"),
+                    item.getString("toEdge"),accepted)
+            }
+            OfflineRouteGraph(graphNodes,graphEdges,turns)
+        }
+        return RoadPack(title, source, license, series, version, segments, signs, located, graph)
     }
 }
