@@ -157,6 +157,16 @@ class RoutePreviewActivity : Activity() {
             isEnabled=false
         }
         controls.addView(navigateButton)
+        val optionalSpeech=CheckBox(this).apply {
+            text="Phát mô tả điểm đổi hướng bằng tiếng Việt offline (thử nghiệm)"
+            isChecked=false
+        }
+        controls.addView(optionalSpeech)
+        controls.addView(TextView(this).apply {
+            text="Mặc định TẮT. Chỉ phát mô tả hình học, không phải chỉ dẫn rẽ hợp pháp. " +
+                "Nếu máy không có giọng tiếng Việt cục bộ, sẽ im lặng."
+            textSize=12f
+        })
         navigateButton.setOnClickListener {
             val p=latestPlan ?:return@setOnClickListener
             if(p.edgeIds.isEmpty()) return@setOnClickListener
@@ -172,7 +182,9 @@ class RoutePreviewActivity : Activity() {
                 .setMessage("Chỉ khởi tạo khi đã đỗ xe an toàn. Tên đường, lượt rẽ, " +
                     "chiều đường và hạn chế phương tiện chưa được chứng nhận. " +
                     "Màn hình sẽ theo dõi tiến độ GPS, tạm ẩn hướng dẫn khi không chắc chắn; " +
-                    "không tự chuyển sang đường khác. Không thao tác khi đang lái.")
+                    "không tự chuyển sang đường khác. Nếu bật giọng nói, app chỉ " +
+                    "mô tả hình học khảo sát, không ra lệnh rẽ hợp pháp. " +
+                    "Không thao tác khi đang lái.")
                 .setNegativeButton("Hủy",null)
                 .setPositiveButton("Tôi đang đỗ, bắt đầu") { _,_ ->
                     stopParkedGps("Đã chuyển sang Dashboard.")
@@ -181,6 +193,7 @@ class RoutePreviewActivity : Activity() {
                         putStringArrayListExtra("navigationNodes",ArrayList(p.nodeIds))
                         putStringArrayListExtra("navigationEdges",ArrayList(p.edgeIds))
                         putExtra("navigationMeters",p.metres)
+                        putExtra("navigationVoiceOptIn",optionalSpeech.isChecked)
                     })
                     finish()
                 }.show()

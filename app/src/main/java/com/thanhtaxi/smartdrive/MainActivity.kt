@@ -32,6 +32,8 @@ import com.thanhtaxi.smartdrive.data.RoadPackRepository
 import com.thanhtaxi.smartdrive.domain.*
 import com.thanhtaxi.smartdrive.media.MediaAccessService
 import com.thanhtaxi.smartdrive.navigation.ActiveNavigationEngine
+import com.thanhtaxi.smartdrive.navigation.GuidancePromptPolicy
+import com.thanhtaxi.smartdrive.navigation.LocalVietnameseGuidance
 import com.thanhtaxi.smartdrive.navigation.NavigationFix
 import com.thanhtaxi.smartdrive.navigation.NavigationPhase
 import com.thanhtaxi.smartdrive.navigation.NavigationUpdate
@@ -105,6 +107,9 @@ class MainActivity : Activity(), LocationListener {
     private var navRoute: RoutePlan?=null
     private var navUpdate=NavigationUpdate(NavigationPhase.IDLE,"Chưa chọn hành trình")
     private var navPolyline: Polyline?=null
+    private var voiceRequested=false
+    private var offlineVoice: LocalVietnameseGuidance?=null
+    private val promptPolicy=GuidancePromptPolicy()
     private lateinit var navPanel: LinearLayout
     private lateinit var navText: TextView
     private lateinit var navStop: Button
@@ -709,6 +714,8 @@ class MainActivity : Activity(), LocationListener {
         val routeEdges=source?.getStringArrayListExtra("navigationEdges")
         if(routeNodes==null || routeEdges==null) return
         val metres=source.getDoubleExtra("navigationMeters",Double.NaN)
+        val userOptedIn=source.getBooleanExtra("navigationVoiceOptIn",false)
+        source.removeExtra("navigationVoiceOptIn")
         source.removeExtra("navigationNodes")
         source.removeExtra("navigationEdges")
         source.removeExtra("navigationMeters")
@@ -721,6 +728,10 @@ class MainActivity : Activity(), LocationListener {
             return
         }
         val generation=++navGeneration
+        voiceRequested=false
+        offlineVoice?.close()
+        offlineVoice=null
+        promptPolicy.reset()
         navPanel.visibility=View.VISIBLE
         navText.text="Đang xác thực và nạp tuyến có hướng…"
         val copy=RoutePlan(routeNodes.toList(),routeEdges.toList(),metres)
@@ -745,6 +756,8 @@ class MainActivity : Activity(), LocationListener {
                     activeNavigation=nav.getOrThrow()
                     navRoute=copy
                     navUpdate=activeNavigation!!.current
+                    voiceRequested=userOptedIn
+                    if(voiceRequested) offlineVoice=LocalVietnameseGuidance(this)
                     showNavigationState()
                     drawNavigationRoute()
                     Toast.makeText(this,"Đang theo tuyến thử; tuân thủ biển và đường thực tế.",
@@ -770,6 +783,14 @@ class MainActivity : Activity(), LocationListener {
                     activeNavigation!==engine) return@runOnUiThread
                 navUpdate=next
                 showNavigationState()
+                if(voiceRequested && offlineVoice?.available==true &&
+                    next.phase==NavigationPhase.ACTIVE) {
+                    val routeId=navRoute?.edgeIds?.joinToString("|").orEmpty()
+                    val prompt=promptPolicy.next(next,routeId)
+                    if(prompt!=null) offlineVoice?.speak(prompt)
+                } else if(next.phase!=NavigationPhase.ACTIVE) {
+                    offlineVoice?.stop()
+                }
             }
         }
     }
@@ -783,7 +804,20 @@ class MainActivity : Activity(), LocationListener {
             else "${it.toInt()} m"
         } ?: "—"
         val next=state.nextManeuver?.take(100) ?: state.message
-        navText.text="ĐIỀU HƯỚNG THỬ • ${state.phase.name} · Còn $distance\n$next"
+        val time=state.etaSeconds?.let {
+            if(it>=3600) "${it/3600}h ${(it%3600)/60}p"
+            else "${(it+59)/60} phút"
+        } ?: "—"
+        val stage=if(state.phase==NavigationPhase.ACTIVE &&
+            state.nextManeuverIndex!=null)
+            " · Bước ${state.nextManeuverIndex+1}/${state.totalManeuvers}"
+            else ""
+        val voiceState=if(voiceRequested)
+            if(offlineVoice?.available==true) " · Loa thử: BẬT"
+            else " · Loa offline: không khả dụng"
+            else " · Loa: TẮT"
+        navText.text="ĐIỀU HƯỚNG THỬ • ${state.phase.name} · Còn $distance" +
+            " · ETA ≈ $time$stage\n$next$voiceState"
         navText.setTextColor(when(state.phase) {
             NavigationPhase.ACTIVE -> Color.WHITE
             NavigationPhase.ARRIVED -> Color.rgb(156,240,170)
@@ -810,6 +844,10 @@ class MainActivity : Activity(), LocationListener {
 
     private fun stopActiveNavigation() {
         ++navGeneration
+        offlineVoice?.close()
+        offlineVoice=null
+        voiceRequested=false
+        promptPolicy.reset()
         activeNavigation=null
         navRoute=null
         navUpdate=NavigationUpdate(NavigationPhase.IDLE,"Đã dừng hành trình")
@@ -833,6 +871,8 @@ class MainActivity : Activity(), LocationListener {
                     isFinishing || isDestroyed) return@runOnUiThread
                 navRoute=plan
                 navUpdate=updated
+                offlineVoice?.stop()
+                promptPolicy.reset()
                 showNavigationState()
                 drawNavigationRoute()
             }
@@ -866,6 +906,8 @@ class MainActivity : Activity(), LocationListener {
     }
     override fun onStart() { super.onStart(); mapView.onStart() }
     override fun onPause() {
+        offlineVoice?.stop()
+        promptPolicy.reset()
         // Clear location confidence when leaving the foreground.
         val nav=activeNavigation
         val generation=navGeneration
@@ -888,6 +930,8 @@ class MainActivity : Activity(), LocationListener {
     }
     override fun onStop() { mapView.onStop(); super.onStop() }
     override fun onDestroy() {
+        offlineVoice?.close()
+        offlineVoice=null
         labelSampler?.stop()
         currentStyleEpoch++
         navWorker.shutdownNow()
