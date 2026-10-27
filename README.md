@@ -43,3 +43,15 @@ Play testing/review. Vì vậy không được Android Auto liệt kê là ứng
 trên màn hình ô tô. Cho phép *Unknown sources* không giúp Car App Library
 templated apps xuất hiện khi chưa có dịch vụ, danh mục app và phân phối
 thử nghiệm phù hợp. Xem [Trạng thái Android Auto](docs/ANDROID-AUTO.md).
+
+## Bản đồ đường phố mặc định
+
+Bản alpha trước đây dùng `demotiles.maplibre.org/style.json`, là bản
+MapLibre World trình diễn quốc gia, **không chứa đầy đủ đường sá ở zoom cao**.
+Mặc định từ bản này dùng OpenFreeMap Liberty, bản đồ OSM street map trực tuyến,
+không cần API key. Khi mất Internet muốn hiển thị đường cần nhập PMTiles raster
+phù hợp hoặc tải gói offline có đủ tile theo điều kiện giấy phép.
+
+Style: https://tiles.openfreemap.org/styles/liberty
+
+Nguồn/tài liệu: https://openfreemap.org/quick_start/

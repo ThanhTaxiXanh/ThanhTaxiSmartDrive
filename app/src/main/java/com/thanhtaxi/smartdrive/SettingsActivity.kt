@@ -34,7 +34,7 @@ class SettingsActivity : Activity() {
         heading("Bản đồ MapLibre")
         val styleInput = EditText(this).apply {
             setSingleLine(true); hint = "HTTPS URL style.json"
-            setText(prefs.getString("style", "https://demotiles.maplibre.org/style.json"))
+            setText(prefs.getString("style", "https://tiles.openfreemap.org/styles/liberty"))
         }
         content.addView(styleInput)
         action("Lưu đường dẫn bản đồ") {

@@ -85,7 +85,7 @@ class RoutePreviewActivity : Activity() {
         mapView.onCreate(savedInstanceState)
         mapView.getMapAsync { m ->
             map = m
-            val style = prefs.getString("style","https://demotiles.maplibre.org/style.json")!!
+            val style = prefs.getString("style","https://tiles.openfreemap.org/styles/liberty")!!
             m.setStyle(style) { showRoute(latestPlan) }
         }
         button.setOnClickListener {

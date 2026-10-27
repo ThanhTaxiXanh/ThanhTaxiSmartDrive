@@ -257,7 +257,7 @@ class MainActivity : Activity(), LocationListener {
         val m = map ?: return
         val mode = prefs.getString("mapSourceMode","online") ?: "online"
         val sha = prefs.getString("pmtilesActiveSha","") ?: ""
-        val url = prefs.getString("style","https://demotiles.maplibre.org/style.json")!!
+        val url = prefs.getString("style","https://tiles.openfreemap.org/styles/liberty")!!
         val key = if(mode=="pmtiles_raster") "pmtiles:$sha" else "online:$url"
         if(key==selectedStyleKey) return
         selectedStyleKey=key

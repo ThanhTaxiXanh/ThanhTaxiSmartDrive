@@ -32,3 +32,11 @@ Still to validate on devices:
 - legal tile usage, credits/attributions and symbol fonts
 
 Never treat offline tiles as navigation routing data or verified speed regulations.
+
+### OpenFreeMap Liberty (mặc định online)
+
+Bản đồ đường phố mặc định dùng https://tiles.openfreemap.org/styles/liberty.
+Nhà cung cấp cho phép mobile app sử dụng công khai không cần API key, nhưng
+đặt hạn mức tải offline (3000 tile hoặc 50 MB mỗi lần tải, tối đa 4 yêu cầu
+song song, cần User-Agent riêng). Không được dùng tính năng tải vùng theo
+cách vi phạm điều kiện của họ. Xem https://openfreemap.org/quick_start/
