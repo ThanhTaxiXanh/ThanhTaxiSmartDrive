@@ -251,6 +251,21 @@ class RoadPackRepository(private val context: Context) {
                 return SurveyAccessRule(vehicles,windows,item.optString("sourceRef").trim(),
                     lanes,blockedVehicles)
             }
+            fun aliases(item: JSONObject):List<String> {
+                if(!item.has("aliases"))return emptyList()
+                val arr=item.optJSONArray("aliases")
+                    ?:throw IllegalArgumentException("aliases phải là array")
+                require(arr.length()<=8)
+                return (0 until arr.length()).map { i ->
+                    val raw=arr.get(i)
+                    require(raw is String)
+                    raw.trim().also { name ->
+                        require(name.length in 1..100 && name.none { it.isISOControl() })
+                    }
+                }.also { names ->
+                    require(names.distinctBy { it.lowercase(java.util.Locale.ROOT) }.size==names.size)
+                }
+            }
             val graphNodes = (0 until points.length()).map { i ->
                 val item = points.getJSONObject(i)
                 val label=item.optString("displayName","").trim()
@@ -258,7 +273,7 @@ class RoadPackRepository(private val context: Context) {
                     "Tên nút khảo sát không hợp lệ"
                 }
                 RouteNode(item.getString("id").trim(), item.getDouble("lat"),
-                    item.getDouble("lon"),label.takeIf { it.isNotBlank() })
+                    item.getDouble("lon"),label.takeIf { it.isNotBlank() },aliases(item))
             }
             val nodeMap = graphNodes.associateBy { it.id }
             val graphEdges = (0 until links.length()).map { i ->
@@ -304,7 +319,19 @@ class RoadPackRepository(private val context: Context) {
                 AllowedTurn(item.getString("fromEdge"),item.getString("viaNode"),
                     item.getString("toEdge"),accepted,parseAccess(item))
             }
-            OfflineRouteGraph(graphNodes,graphEdges,turns)
+            val poiArray=routing.optJSONArray("destinations")
+            require(!routing.has("destinations") || poiArray!=null)
+            require((poiArray?.length()?:0)<=20_000)
+            val places=if(poiArray==null) emptyList() else
+                (0 until poiArray.length()).map { i ->
+                    val item=poiArray.getJSONObject(i)
+                    SurveyDestination(
+                        item.getString("id").trim(),item.getString("title").trim(),
+                        item.getString("nodeId"),
+                        LocalPlaceCategory.valueOf(item.getString("category")),
+                        aliases(item),item.getString("sourceRef").trim())
+                }
+            OfflineRouteGraph(graphNodes,graphEdges,turns,places)
         }
         return RoadPack(title, source, license, series, version, segments, signs, located, graph)
     }
