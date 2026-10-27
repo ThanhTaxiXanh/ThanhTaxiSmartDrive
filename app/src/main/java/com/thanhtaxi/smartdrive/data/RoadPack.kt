@@ -186,7 +186,8 @@ class RoadPackRepository(private val context: Context) {
                 val rule=item.optJSONObject("restrictions")
                     ?:throw IllegalArgumentException("restrictions phải là object")
                 require(rule.keys().asSequence().toSet()
-                    .all { it=="allowedVehicles" || it=="blockedWindows" }) {
+                    .all { it=="allowedVehicles" || it=="blockedVehicles" ||
+                        it=="allowedLanes" || it=="blockedWindows" }) {
                     "Quy định hạn chế chứa trường không được hỗ trợ"
                 }
                 require(item.optBoolean("reviewed",false) &&
@@ -201,6 +202,24 @@ class RoadPackRepository(private val context: Context) {
                     }.toSet().also { require(it.size==allowed.length()) }
                 }
                 if(rule.has("allowedVehicles")) require(allowed!=null)
+                val blockedVehiclesJson=rule.optJSONArray("blockedVehicles")
+                if(rule.has("blockedVehicles")) require(blockedVehiclesJson!=null)
+                val blockedVehicles=if(blockedVehiclesJson==null) emptySet() else {
+                    require(blockedVehiclesJson.length() in 1..RoutingVehicle.entries.size)
+                    (0 until blockedVehiclesJson.length()).map { ix ->
+                        RoutingVehicle.valueOf(blockedVehiclesJson.getString(ix))
+                    }.toSet().also { require(it.size==blockedVehiclesJson.length()) }
+                }
+                val lanesJson=rule.optJSONArray("allowedLanes")
+                if(rule.has("allowedLanes")) require(lanesJson!=null)
+                val lanes=if(lanesJson==null) emptySet() else {
+                    require(lanesJson.length() in 1..12)
+                    (0 until lanesJson.length()).map { ix ->
+                        val n=lanesJson.get(ix)
+                        require(n is Int && n in 1..12) { "Làn phải là integer 1..12" }
+                        n
+                    }.toSet().also { require(it.size==lanesJson.length()) }
+                }
                 val blocked=rule.optJSONArray("blockedWindows")
                 if(rule.has("blockedWindows")) require(blocked!=null)
                 val windows=if(blocked==null) emptyList() else {
@@ -225,10 +244,12 @@ class RoadPackRepository(private val context: Context) {
                         SurveyClosure(dayList.toSet(),start,end)
                     }
                 }
-                require(vehicles.isNotEmpty() || windows.isNotEmpty()) {
+                require(vehicles.isNotEmpty() || blockedVehicles.isNotEmpty() ||
+                    lanes.isNotEmpty() || windows.isNotEmpty()) {
                     "Hạn chế giao thông phải có điều kiện hợp lệ"
                 }
-                return SurveyAccessRule(vehicles,windows,item.optString("sourceRef").trim())
+                return SurveyAccessRule(vehicles,windows,item.optString("sourceRef").trim(),
+                    lanes,blockedVehicles)
             }
             val graphNodes = (0 until points.length()).map { i ->
                 val item = points.getJSONObject(i)
@@ -258,6 +279,11 @@ class RoadPackRepository(private val context: Context) {
                     OfflineRouteGraph.haversine(end.lat,end.lon,lastLat,lastLon) <= 8.0) {
                     "Đỉnh routing phải trùng các đầu mút đoạn đường"
                 }
+                val assumedSpeed=if(item.has("modelSpeedKph")) {
+                    val raw=item.get("modelSpeedKph")
+                    require(raw is Number) { "modelSpeedKph phải là số" }
+                    raw.toDouble().also { require(it.isFinite() && it in 5.0..110.0) }
+                } else null
                 val metres = item.getDouble("distanceMeters")
                 val direct = OfflineRouteGraph.haversine(start.lat,start.lon,end.lat,end.lon)
                 require(direct > 2.0 && metres.isFinite() && metres >= direct*0.9 &&
@@ -267,7 +293,7 @@ class RoadPackRepository(private val context: Context) {
                     "Đoạn routing đã duyệt cần sourceRef khảo sát"
                 }
                 RouteEdge(item.getString("id").trim(),start.id,end.id,road.id,metres,
-                    accepted && road.reviewed,parseAccess(item))
+                    accepted && road.reviewed,parseAccess(item),assumedSpeed)
             }
             val turns = (0 until approvedTurns.length()).map { i ->
                 val item = approvedTurns.getJSONObject(i)
