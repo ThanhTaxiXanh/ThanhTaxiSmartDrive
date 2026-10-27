@@ -39,6 +39,42 @@ class SurveyNavigationPreviewTest {
         assertEquals(SurveyLookupStatus.AMBIGUOUS,
             SurveyPointSearch.resolve(dup,"Bến xe").status)
     }
+    @Test fun offlinePoiAliasAndCategoryResolveOnlyToImportedNode() {
+        val places=listOf(
+            SurveyDestination("pickup-1","Điểm đón thử","B",LocalPlaceCategory.PICKUP,
+                listOf("Diem don khach","Bến thử"),"fixture-provenance"),
+            SurveyDestination("parking-2","Bãi đỗ giả lập","C",LocalPlaceCategory.PARKING,
+                listOf("do xe"),"fixture-provenance"))
+        val graph=OfflineRouteGraph(nodes,edges,turns,places)
+        val idx=OfflineDestinationIndex(graph)
+        assertEquals("B",idx.resolve("diem don khach").nodeId)
+        assertEquals("B",idx.resolve("Điểm đón thử [POI:pickup-1]").nodeId)
+        assertEquals("C",idx.resolve("poi:parking-2").nodeId)
+        assertEquals(listOf("Điểm đón thử [POI:pickup-1]"),
+            idx.suggestions("diem don"))
+        assertEquals("C",idx.resolve("do xe").nodeId)
+        assertEquals(SurveyLookupStatus.NOT_FOUND,idx.resolve("Trường hợp chưa nhập").status)
+        val duplicates=OfflineRouteGraph(nodes,edges,turns,places+
+            SurveyDestination("pickup-3","Quầy đón khác","D",LocalPlaceCategory.PICKUP,
+                listOf("Diem don khach"),"test"))
+        assertEquals(SurveyLookupStatus.AMBIGUOUS,
+            OfflineDestinationIndex(duplicates).resolve("diem don khach").status)
+    }
+
+    @Test fun offlineSearchRejectsDanglingPoiAndMalformedAliases() {
+        try {
+            OfflineRouteGraph(nodes,edges,turns,listOf(SurveyDestination(
+                "poi","Giả lập","MISSING",LocalPlaceCategory.OTHER,
+                emptyList(),"fixture")))
+            fail("unknown node")
+        } catch (_:IllegalArgumentException) {}
+        try {
+            OfflineRouteGraph(nodes.map { if(it.id=="A")
+                it.copy(aliases=listOf("Sai\\nDữ liệu")) else it },edges,turns)
+            fail("control char in alias")
+        } catch (_:IllegalArgumentException) {}
+    }
+
     @Test fun rejectsAmbiguousDistantAndInvalidCoordinates() {
         val close=OfflineRouteGraph(listOf(RouteNode("W",21.0,106.0),
             RouteNode("E",21.0,106.00009)),emptyList(),emptyList())
