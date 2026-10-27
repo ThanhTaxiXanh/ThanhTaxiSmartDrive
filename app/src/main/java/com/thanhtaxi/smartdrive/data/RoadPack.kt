@@ -185,6 +185,10 @@ class RoadPackRepository(private val context: Context) {
                 if(!item.has("restrictions")) return SurveyAccessRule()
                 val rule=item.optJSONObject("restrictions")
                     ?:throw IllegalArgumentException("restrictions phải là object")
+                require(rule.keys().asSequence().toSet()
+                    .all { it=="allowedVehicles" || it=="blockedWindows" }) {
+                    "Quy định hạn chế chứa trường không được hỗ trợ"
+                }
                 require(item.optBoolean("reviewed",false) &&
                     item.optString("sourceRef","").isNotBlank()) {
                     "Quy định hạn chế cần dấu reviewed và sourceRef khảo sát"
@@ -194,7 +198,7 @@ class RoadPackRepository(private val context: Context) {
                     require(allowed.length() in 1..RoutingVehicle.entries.size)
                     (0 until allowed.length()).map { ix ->
                         RoutingVehicle.valueOf(allowed.getString(ix))
-                    }.toSet().also { require(it.isNotEmpty()) }
+                    }.toSet().also { require(it.size==allowed.length()) }
                 }
                 if(rule.has("allowedVehicles")) require(allowed!=null)
                 val blocked=rule.optJSONArray("blockedWindows")
@@ -205,8 +209,20 @@ class RoadPackRepository(private val context: Context) {
                         val w=blocked.getJSONObject(ix)
                         val days=w.getJSONArray("days")
                         require(days.length() in 1..7)
-                        val values=(0 until days.length()).map { days.getInt(it) }.toSet()
-                        SurveyClosure(values,w.getInt("startMinute"),w.getInt("endMinute"))
+                        require(w.keys().asSequence().toSet() ==
+                            setOf("days","startMinute","endMinute")) {
+                            "Khung giờ cấm có trường lạ hoặc thiếu trường"
+                        }
+                        val dayList=(0 until days.length()).map { idx ->
+                            val raw=days.get(idx)
+                            require(raw is Int) { "ISO weekday phải là integer" }
+                            raw
+                        }
+                        require(dayList.distinct().size==dayList.size)
+                        val start=w.get("startMinute")
+                        val end=w.get("endMinute")
+                        require(start is Int && end is Int) { "Minute phải là integer" }
+                        SurveyClosure(dayList.toSet(),start,end)
                     }
                 }
                 require(vehicles.isNotEmpty() || windows.isNotEmpty()) {
