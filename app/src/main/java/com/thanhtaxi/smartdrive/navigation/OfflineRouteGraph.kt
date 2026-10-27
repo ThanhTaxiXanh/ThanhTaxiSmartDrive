@@ -279,6 +279,12 @@ class OfflineRouteGraph(
             if(!isEdgeAvailableDuring(s.edgeId,context.vehicle,context.lane,
                     s.enterEpochMs,s.exitEpochMs))return false
             val e=edgesById[s.edgeId]?:return false
+            val expected= kotlin.math.ceil(e.metres*3600.0/
+                s.modelSpeedKph*1000.0).toLong().coerceAtLeast(1L)
+            if(s.exitEpochMs-s.enterEpochMs!=expected ||
+                (e.assumedSpeedKph!=null &&
+                    kotlin.math.abs(e.assumedSpeedKph-s.modelSpeedKph)>0.001))
+                return false
             total+=e.metres
             previousExit=s.exitEpochMs
         }
