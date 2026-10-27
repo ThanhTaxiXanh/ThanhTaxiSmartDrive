@@ -11,74 +11,92 @@ enum class SurveyLookupStatus { EXACT_ID, NEAREST_NODE, AMBIGUOUS, NOT_FOUND, BA
 data class SurveyLookup(val nodeId: String?, val status: SurveyLookupStatus, val detail: String)
 
 /** Deliberately refuses to snap to a distant or ambiguous surveyed node. */
-object SurveyPointSearch {
-    /** Accent-insensitive matching for user-provided local names, not geocoding. */
-    internal fun fold(input: String): String =
-        Normalizer.normalize(input.lowercase(Locale.ROOT)
-            .replace('đ','d'),Normalizer.Form.NFD)
-            .replace(Regex("\\p{M}+"),"").trim()
+/**
+ * In-memory index for one imported licensed survey pack. No network and no
+ * fabricated reverse geocoding; results always resolve to an existing node.
+ */
+class OfflineDestinationIndex(private val graph: OfflineRouteGraph) {
+    private data class Entry(val target:String,val label:String,val names:List<String>,
+                             val isPoi:Boolean)
+    private val records:List<Entry> = graph.nodes.values.map { node ->
+        val label=if(node.displayName.isNullOrBlank()) node.id
+            else "${node.displayName} (${node.id})"
+        Entry(node.id,label,listOfNotNull(node.id,node.displayName)+node.aliases,false)
+    } + graph.destinations.map { poi ->
+        Entry(poi.nodeId,"${poi.title} [POI:${poi.id}]",
+            listOf(poi.title,poi.id,"poi:${poi.id}")+poi.aliases,true)
+    }
+    fun allLabels(): List<String> = records.map { it.label }.sorted()
 
-    fun suggestions(graph: OfflineRouteGraph, query: String, maxResults: Int = 8): List<String> {
-        if (maxResults !in 1..20) return emptyList()
-        val q=fold(query)
-        if(q.isBlank()) return emptyList()
-        return graph.nodes.values.asSequence()
-            .filter { fold(it.id).contains(q) ||
-                it.displayName?.let { name -> fold(name).contains(q) }==true }
-            .sortedWith(compareBy<RouteNode> { !fold(it.id).startsWith(q) &&
-                it.displayName?.let { name -> fold(name).startsWith(q) }!=true }
-                .thenBy { it.id.length }.thenBy { it.id })
-            .map { node ->
-                if(node.displayName.isNullOrBlank()) node.id
-                else "${node.displayName} (${node.id})"
+    fun suggestions(query:String,maxResults:Int=8):List<String> {
+        if(maxResults !in 1..20)return emptyList()
+        val q=SurveyPointSearch.fold(query)
+        if(q.isBlank())return emptyList()
+        val tokens=q.split(Regex("\\s+")).filter { it.isNotBlank() }
+        return records.asSequence().mapNotNull { entry ->
+            val folded=entry.names.map(SurveyPointSearch::fold)
+            val rank=when {
+                folded.any { it==q } -> 0
+                folded.any { it.startsWith(q) } -> 1
+                folded.any { name -> tokens.all { it in name } } -> 2
+                folded.any { it.contains(q) } -> 3
+                else -> null
             }
-            .take(maxResults).toList()
+            rank?.let { Triple(rank,entry.label,entry) }
+        }.sortedWith(compareBy<Triple<Int,String,Entry>> { it.first }
+            .thenBy { it.second.length }.thenBy { it.second })
+            .take(maxResults).map { it.third.label }.toList()
     }
 
-    fun resolve(graph: OfflineRouteGraph, query: String, radiusMeters: Double=75.0): SurveyLookup {
+    fun resolve(query:String,radiusMeters:Double=75.0):SurveyLookup {
         val q=query.trim()
-        if(q.isBlank()) return SurveyLookup(null,SurveyLookupStatus.BAD_QUERY,"Chưa nhập nút khảo sát.")
+        if(q.isBlank()) return SurveyLookup(null,SurveyLookupStatus.BAD_QUERY,"Chưa nhập điểm.")
         if(q in graph.nodes) return SurveyLookup(q,SurveyLookupStatus.EXACT_ID,"Đúng mã nút khảo sát.")
-        // Names are read only from the imported, user-licensed survey package.
-        // Never interpret arbitrary address text as a national geocoder result.
-        val idFromLabel=graph.nodes.values.firstOrNull {
-            !it.displayName.isNullOrBlank() &&
-                q.equals("${it.displayName} (${it.id})",ignoreCase=true)
-        }
-        if(idFromLabel!=null) return SurveyLookup(idFromLabel.id,
-            SurveyLookupStatus.EXACT_ID,"Tên điểm từ gói khảo sát đã nhập; chưa xác thực địa chỉ.")
-        val folded=fold(q)
-        val named=graph.nodes.values.filter {
-            !it.displayName.isNullOrBlank() && folded==fold(it.displayName)
-        }
-        if(named.size==1) return SurveyLookup(named[0].id,
-            SurveyLookupStatus.EXACT_ID,"Tên điểm từ gói khảo sát đã nhập; chưa xác thực địa chỉ.")
-        if(named.size>1) return SurveyLookup(null,SurveyLookupStatus.AMBIGUOUS,
-            "Trùng tên điểm trong gói khảo sát; chọn ID cụ thể.")
-        val pair=q.split(",")
-        if(pair.size!=2) return SurveyLookup(null,SurveyLookupStatus.NOT_FOUND,
-            "Chỉ hỗ trợ ID nút đã nhập hoặc tọa độ WGS84 'vĩ độ,kinh độ'; chưa có tìm kiếm địa chỉ.")
-        val lat=pair[0].trim().toDoubleOrNull()
-        val lon=pair[1].trim().toDoubleOrNull()
+        val folded=SurveyPointSearch.fold(q)
+        val exact=records.filter { e ->
+            SurveyPointSearch.fold(e.label)==folded ||
+                e.names.any { SurveyPointSearch.fold(it)==folded }
+        }.map { it.target }.distinct()
+        if(exact.size==1) return SurveyLookup(exact.first(),SurveyLookupStatus.EXACT_ID,
+            "Điểm từ gói khảo sát đã nhập, chưa xác minh địa chỉ độc lập.")
+        if(exact.size>1) return SurveyLookup(null,SurveyLookupStatus.AMBIGUOUS,
+            "Nhiều điểm/biệt danh trùng nhau; hãy chọn đúng nhãn có ID.")
+        val values=q.split(",")
+        if(values.size!=2) return SurveyLookup(null,SurveyLookupStatus.NOT_FOUND,
+            "Không có điểm offline khớp chính xác; chọn gợi ý có ID, chưa có geocoder toàn quốc.")
+        val lat=values[0].trim().toDoubleOrNull()
+        val lon=values[1].trim().toDoubleOrNull()
         if(lat==null || lon==null || !lat.isFinite() || !lon.isFinite() ||
             lat !in -90.0..90.0 || lon !in -180.0..180.0 ||
             !radiusMeters.isFinite() || radiusMeters !in 1.0..150.0)
             return SurveyLookup(null,SurveyLookupStatus.BAD_QUERY,"Tọa độ WGS84 không hợp lệ.")
         val nearest=graph.nodes.values.asSequence()
             .map { it.id to OfflineRouteGraph.haversine(lat,lon,it.lat,it.lon) }
-            .filter { it.second <= radiusMeters }
+            .filter { it.second<=radiusMeters }
             .sortedWith(compareBy<Pair<String,Double>> { it.second }.thenBy { it.first })
             .take(2).toList()
         if(nearest.isEmpty()) return SurveyLookup(null,SurveyLookupStatus.NOT_FOUND,
-            "Không có nút khảo sát trong bán kính ${radiusMeters.toInt()}m; không tự tạo đường.")
-        if(nearest.size>1 && nearest[1].second-nearest[0].second < 20.0)
+            "Không có nút khảo sát trong ${radiusMeters.toInt()}m; không tự tạo điểm đến.")
+        if(nearest.size>1 && nearest[1].second-nearest[0].second<20.0)
             return SurveyLookup(null,SurveyLookupStatus.AMBIGUOUS,
-                "Gần nhiều nút khảo sát; hãy chọn chính xác ID, không tự đoán.")
-        val found=nearest.first()
-        return SurveyLookup(found.first,SurveyLookupStatus.NEAREST_NODE,
-            "Gần nút ${found.first}, cách %.1fm; CHỈ là ghép tọa độ thử."
-                .format(java.util.Locale.ROOT,found.second))
+                "Gần nhiều nút; chọn ID cụ thể, không tự đoán.")
+        return SurveyLookup(nearest.first().first,SurveyLookupStatus.NEAREST_NODE,
+            "Ghép tọa độ giả lập với nút khảo sát; cách %.1f m, chưa xác thực."
+                .format(Locale.ROOT,nearest.first().second))
     }
+}
+
+object SurveyPointSearch {
+    internal fun fold(input:String):String =
+        Normalizer.normalize(input.lowercase(Locale.ROOT).replace('đ','d'),
+            Normalizer.Form.NFD).replace(Regex("\\p{M}+"),"")
+            .replace(Regex("\\s+")," ").trim()
+
+    fun suggestions(graph:OfflineRouteGraph,query:String,maxResults:Int=8) =
+        OfflineDestinationIndex(graph).suggestions(query,maxResults)
+
+    fun resolve(graph:OfflineRouteGraph,query:String,radiusMeters:Double=75.0) =
+        OfflineDestinationIndex(graph).resolve(query,radiusMeters)
 }
 
 enum class RouteDeviationState { UNKNOWN, ON_ROUTE, SUSPECTED, OFF_ROUTE }
