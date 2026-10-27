@@ -32,6 +32,12 @@ class PmtilesVectorMetadataTest {
         val f=archive("""{"vector_layers":[{"id":"hotosm_roads"}]}""",false)
         assertEquals(listOf("hotosm_roads"),PmtilesVectorMetadata.read(f).layers)
     }
+    @Test fun preservesAdvertisedRoadNameAndRefFieldNames() {
+        val f=archive("""{"vector_layers":[{"id":"roads","fields":{"name":"String","name:vi":"String","ref":"String","speed":"Number"}}]}""",true)
+        val info=PmtilesVectorMetadata.read(f)
+        assertEquals(listOf("name","name:vi","ref","speed"),info.fieldsByLayer["roads"])
+        assertFalse(info.fieldsByLayer["roads"]!!.contains("maxspeed"))
+    }
     @Test fun readsGzippedTileJson() {
         val f=archive("""{"vector_layers":[{"id":"transportation"},{"id":"roads"}]}""",true)
         assertEquals(2,PmtilesVectorMetadata.read(f).layers.size)

@@ -9,7 +9,11 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.zip.GZIPInputStream
 
-data class PmtilesVectorInfo(val layers: List<String>, val warning: String?) {
+data class PmtilesVectorInfo(
+    val layers: List<String>,
+    val warning: String?,
+    val fieldsByLayer: Map<String, List<String>> = emptyMap()
+) {
     val previewable: Boolean get() = layers.isNotEmpty() && warning == null
 }
 
@@ -43,17 +47,30 @@ object PmtilesVectorMetadata {
             val vectorLayers = info.optJSONArray("vector_layers")
                 ?: return PmtilesVectorInfo(emptyList(),"Archive does not declare vector_layers")
             val ids = mutableListOf<String>()
+            val fieldsByLayer = linkedMapOf<String, List<String>>()
             for (i in 0 until vectorLayers.length()) {
-                val id = vectorLayers.optJSONObject(i)?.optString("id") ?: continue
+                val item = vectorLayers.optJSONObject(i) ?: continue
+                val id = item.optString("id")
                 if (!SAFE_ID.matches(id)) {
                     return PmtilesVectorInfo(emptyList(),"Invalid source-layer identifier in archive metadata")
                 }
                 if (id !in ids) ids.add(id)
                 require(ids.size <= 128) { "Too many source layers" }
+                val fields = item.optJSONObject("fields")
+                if (fields != null) {
+                    val names = mutableListOf<String>()
+                    val keys = fields.keys()
+                    while (keys.hasNext()) {
+                        val field = keys.next()
+                        if (SAFE_ID.matches(field)) names.add(field)
+                        require(names.size <= 256) { "Too many fields in a vector layer" }
+                    }
+                    fieldsByLayer[id] = names.sorted()
+                }
             }
             return if(ids.isEmpty())
                 PmtilesVectorInfo(emptyList(),"No usable source-layer was advertised in metadata")
-            else PmtilesVectorInfo(ids,null)
+            else PmtilesVectorInfo(ids,null,fieldsByLayer)
         }
     }
 
