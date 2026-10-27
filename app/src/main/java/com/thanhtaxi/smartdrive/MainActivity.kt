@@ -134,8 +134,17 @@ class MainActivity : Activity(), LocationListener {
             setBackgroundColor(0xC9121720.toInt())
             maxLines = 2
         }
-        mapPane.addView(mapStatusLabel, FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM))
+        mapPane.addView(mapStatusLabel, FrameLayout.LayoutParams(-2,-2,
+            Gravity.BOTTOM or Gravity.RIGHT).apply {
+            bottomMargin=dp(36)
+            rightMargin=dp(6)
+            width=dp(if(landscape) 310 else 285)
+        })
         mapView.onCreate(state)
+        mapView.addOnDidFailLoadingMapListener { reason ->
+            android.util.Log.w("ThanhTaxiMap", "Map style/tile failed: " + reason)
+            mapStatusLabel.text = "Lỗi tải bản đồ: kiểm tra Internet, style URL và tile server. PMTiles cần gói bao phủ vị trí."
+        }
         mapView.getMapAsync { readyMap ->
             map = readyMap
             loadSelectedMap()
@@ -196,7 +205,10 @@ class MainActivity : Activity(), LocationListener {
         qrCard.addView(label("THANH TOÁN / QR", 18f))
         qrImage = ImageView(this).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_CENTER }
         qrNotice = label("Chọn ảnh QR trong Cài đặt (khi xe đỗ).", 13f)
-        qrCard.addView(qrImage, LinearLayout.LayoutParams(-1, 0, 1f)); qrCard.addView(qrNotice)
+        qrCard.addView(qrImage, if(landscape)
+            LinearLayout.LayoutParams(-1,0,1f) else
+            LinearLayout.LayoutParams(-1,dp(155)))
+        qrCard.addView(qrNotice)
         val mediaCard = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = cardBackground(); setPadding(6,6,6,6) }
         mediaLabel = label("Media: chưa được cấp quyền / không có phiên phát", 14f)
         mediaCard.addView(mediaLabel)
@@ -214,16 +226,23 @@ class MainActivity : Activity(), LocationListener {
         }
         mediaButton("▶▶") { it.transportControls.skipToNext() }
         mediaCard.addView(mediaBtns)
-        right.addView(calendarCard, LinearLayout.LayoutParams(-1,0,0.25f).apply { bottomMargin=5 })
-        right.addView(qrCard, LinearLayout.LayoutParams(-1,0,0.55f).apply { bottomMargin=5 })
-        right.addView(mediaCard, LinearLayout.LayoutParams(-1,0,0.20f))
+        if(landscape) {
+            right.addView(calendarCard, LinearLayout.LayoutParams(-1,0,0.25f).apply { bottomMargin=5 })
+            right.addView(qrCard, LinearLayout.LayoutParams(-1,0,0.55f).apply { bottomMargin=5 })
+            right.addView(mediaCard, LinearLayout.LayoutParams(-1,0,0.20f))
+        } else {
+            right.addView(calendarCard,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(5) })
+            right.addView(qrCard,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(5) })
+            right.addView(mediaCard,LinearLayout.LayoutParams(-1,-2))
+        }
         if (landscape) {
             root.addView(mapPane, LinearLayout.LayoutParams(0,-1,0.70f).apply { rightMargin=5 })
             root.addView(right, LinearLayout.LayoutParams(0,-1,0.30f))
         } else {
             root.addView(mapPane, LinearLayout.LayoutParams(-1,0,0.62f))
             val section = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            section.addView(right, LinearLayout.LayoutParams(-1,0,1f))
+            section.addView(ScrollView(this).apply { addView(right) },
+                LinearLayout.LayoutParams(-1,0,1f))
             val settings = Button(this).apply {
                 text = "Cài đặt / nhập dữ liệu (chỉ khi xe đỗ)"
                 setOnClickListener { if (isStopped()) startActivity(Intent(this@MainActivity, SettingsActivity::class.java).putExtra("verifiedStopped", true))

@@ -40,10 +40,19 @@ class SettingsActivity : Activity() {
         action("Lưu đường dẫn bản đồ") {
             val url = styleInput.text.toString().trim()
             if (OfflineAreaCatalog.validStyleUri(url)) {
-                prefs.edit().putString("style", url).apply()
+                prefs.edit().putString("style", url)
+                    .putString("mapSourceMode","online").apply()
                 Toast.makeText(this, "Đã lưu. Mở lại dashboard để áp dụng", Toast.LENGTH_SHORT).show()
             } else Toast.makeText(this, "Cần URL HTTPS", Toast.LENGTH_SHORT).show()
         }
+        action("Chuyển Dashboard về bản đồ online") {
+            prefs.edit().putString("mapSourceMode","online").apply()
+            Toast.makeText(this,"Đã chuyển về nguồn online; quay lại Dashboard để thử.",Toast.LENGTH_LONG).show()
+        }
+        content.addView(TextView(this).apply {
+            text="Nếu bản đồ xanh/trống: kiểm tra 4G/Wi-Fi, quyền Internet, style URL và tile server. " +
+                "GPS hoạt động không chứng minh tile đã tải. Tên biển số tốc độ -- là bình thường khi chưa nhập dữ liệu."
+        })
         heading("Bản đồ offline (khi xe đã đỗ)")
         action("Quản lý vùng tải offline Bắc Giang / Bắc Ninh") {
             val parked = intent.getBooleanExtra("verifiedStopped", false)

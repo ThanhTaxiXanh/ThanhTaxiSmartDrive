@@ -65,3 +65,18 @@ Storage Access Framework.
 Trạng thái `READY_FOR_HUMAN_REVIEW` chỉ là **báo cáo người dùng tự khai**,
 không phải kiểm chứng tile-level tự động, không chứng minh đã bật chế độ
 máy bay hay ảnh bản đồ/biển báo chính xác.
+
+## Vào Dashboard với PMTiles cục bộ (bản sửa giao diện)
+
+1. Chỉ khi xe đỗ: Dashboard → Cài đặt → Nhập PMTiles cục bộ.
+2. Điền tên bộ dữ liệu, giấy phép, attribution; chọn gói raster PNG/JPEG/WebP.
+3. Nhập, bấm **Xem thử raster**, sau đó **Dùng PMTiles raster này trên Dashboard**.
+4. Quay lại Dashboard; màn hình kiểm tra checksum ở luồng nền rồi load
+   style nguồn `pmtiles://file:///...` từ bộ nhớ riêng.
+5. Nếu GPS nằm ngoài bounding box, bản đồ sẽ hiển thị tâm vùng gói
+   và thông báo GPS nằm ngoài vùng; không tự kéo camera ra vùng tile trống.
+6. Muốn dùng online trở lại: Cài đặt → **Chuyển Dashboard về bản đồ online**.
+
+Bản map có thể vẫn trắng vì archive không có tile hợp lệ, zoom không phù
+hợp, dữ liệu không bao phủ vị trí hoặc thiết bị không hỗ trợ. Phải quan sát
+màn hình thiết bị thật để kết luận bản đồ offline hoạt động.
