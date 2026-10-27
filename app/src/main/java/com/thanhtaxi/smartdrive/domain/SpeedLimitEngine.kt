@@ -27,7 +27,8 @@ data class SpeedEvidence(
     val validFromEpochMs: Long = Long.MIN_VALUE,
     val validUntilEpochMs: Long = Long.MAX_VALUE,
     val confidence: Double = 1.0,
-    val reviewed: Boolean = false
+    val reviewed: Boolean = false,
+    val sourceRef: String? = null
 )
 data class LimitResult(
     val kph: Int?,

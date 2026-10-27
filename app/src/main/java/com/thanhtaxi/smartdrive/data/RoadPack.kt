@@ -9,7 +9,8 @@ import kotlin.math.*
 
 data class Segment(
     val id: String, val startLat: Double, val startLon: Double, val endLat: Double, val endLon: Double,
-    val kind: RoadKind, val zone: PopulationZone, val direction: String, val reviewed: Boolean
+    val kind: RoadKind, val zone: PopulationZone, val direction: String, val reviewed: Boolean,
+    val sourceRef: String? = null
 )
 data class RoadPack(
     val title: String, val source: String, val license: String,
@@ -98,10 +99,12 @@ class RoadPackRepository(private val context: Context) {
             val a = o.getJSONArray("from"); val b = o.getJSONArray("to")
             fun lat(v: Double) = v.also { require(it.isFinite() && it in -90.0..90.0) }
             fun lon(v: Double) = v.also { require(it.isFinite() && it in -180.0..180.0) }
+            val sourceRef = o.optString("sourceRef").trim().takeIf { it.isNotBlank() && it.length <= 256 }
             Segment(o.getString("id"), lat(a.getDouble(0)), lon(a.getDouble(1)),
                 lat(b.getDouble(0)), lon(b.getDouble(1)),
                 RoadKind.valueOf(o.getString("roadKind")), PopulationZone.valueOf(o.getString("populationZone")),
-                o.optString("direction", "forward"), o.optBoolean("reviewed", false))
+                o.optString("direction", "forward"),
+                o.optBoolean("reviewed", false) && sourceRef != null, sourceRef)
         }
         require(segments.distinctBy { it.id }.size == segments.size) { "Trùng segment ID" }
         require(segments.all { it.id.isNotBlank() &&
@@ -109,6 +112,7 @@ class RoadPackRepository(private val context: Context) {
                 RoadLine(it.id,it.startLat,it.startLon,it.endLat,it.endLon,it.reviewed))
                 .lengthMeters in 3.0..2500.0 }) { "Đoạn đường không hợp lệ hoặc dài quá 2,5km" }
         val ids = segments.map { it.id }.toSet()
+        val eligibleRoads = segments.filter { it.reviewed }.map { it.id }.toSet()
         val arr = root.optJSONArray("speedSigns")
         require((arr?.length() ?: 0) <= 25000)
         val signs = if (arr == null) emptyList() else (0 until arr.length()).map { i ->
@@ -120,13 +124,16 @@ class RoadPackRepository(private val context: Context) {
                 "speedSigns chỉ nhận dữ liệu thuộc đoạn đường; biển P.127 phải dùng trafficSigns có tọa độ"
             }
             require(o.getInt("kph") in 5..130)
+            val sourceRef = o.optString("sourceRef").trim().takeIf { it.isNotBlank() && it.length <= 256 }
             SpeedEvidence(kph = o.getInt("kph"), segmentId = id,
                 source = src,
                 direction = o.optString("direction").takeIf { it.isNotBlank() },
                 lane = if (o.has("lane")) o.getInt("lane") else null,
                 validFromEpochMs = o.optLong("validFrom", Long.MIN_VALUE),
                 validUntilEpochMs = o.optLong("validUntil", Long.MAX_VALUE),
-                confidence = o.optDouble("confidence", 1.0), reviewed = o.optBoolean("reviewed", false))
+                confidence = o.optDouble("confidence", 1.0),
+                reviewed = o.optBoolean("reviewed", false) && sourceRef != null && id in eligibleRoads,
+                sourceRef = sourceRef)
         }
         val roads = segments.associateBy { it.id }
         val trafficArray = root.optJSONArray("trafficSigns")
@@ -154,6 +161,7 @@ class RoadPackRepository(private val context: Context) {
             require(from <= until)
             val confidence = o.optDouble("confidence", 0.0)
             require(confidence.isFinite() && confidence in 0.0..1.0)
+            val sourceRef = o.optString("sourceRef").trim().takeIf { it.isNotBlank() && it.length <= 256 }
             LocatedRoadSign(
                 id = signId, segmentId = segmentId, kind = code,
                 latitude = lat, longitude = lon, progressMeters = projection.progressMeters,
@@ -161,7 +169,8 @@ class RoadPackRepository(private val context: Context) {
                 lane = lane,
                 vehicle = o.optString("vehicle").takeIf { it.isNotBlank() }?.let { VehicleClass.valueOf(it) },
                 validFromMs = from, validUntilMs = until, confidence = confidence,
-                reviewed = o.optBoolean("reviewed", false) && road.reviewed
+                reviewed = o.optBoolean("reviewed", false) && road.reviewed && sourceRef != null,
+                sourceRef = sourceRef
             )
         }
         require(located.distinctBy { it.id }.size == located.size) { "Trùng mã ID biển báo" }

@@ -358,7 +358,7 @@ class MainActivity : Activity(), LocationListener {
             signMarkers.add(m.addMarker(MarkerOptions()
                 .position(LatLng(sign.latitude,sign.longitude))
                 .title(title)
-                .snippet("Nguồn: gói khảo sát người dùng; cần kiểm chứng tại hiện trường")))
+                .snippet("Nguồn khảo sát: ${sign.sourceRef ?: "chưa xác định"}; cần kiểm chứng tại hiện trường")))
         }
         lastMarkerLocation = Location(loc)
     }

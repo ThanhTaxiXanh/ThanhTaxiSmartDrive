@@ -11,7 +11,8 @@ data class LocatedRoadSign(
     val direction: String? = null, val lane: Int? = null,
     val vehicle: VehicleClass? = null,
     val validFromMs: Long = Long.MIN_VALUE, val validUntilMs: Long = Long.MAX_VALUE,
-    val confidence: Double = 1.0, val reviewed: Boolean = false
+    val confidence: Double = 1.0, val reviewed: Boolean = false,
+    val sourceRef: String? = null
 )
 data class UpcomingSign(val kind: SignKind, val metres: Int, val kph: Int?)
 data class SignDecision(
@@ -68,7 +69,8 @@ class TrafficSignEngine {
             source = EvidenceSource.VERIFIED_SIGN,
             direction = current!!.direction, lane = current!!.lane, vehicle = current!!.vehicle,
             confidence = current!!.confidence, reviewed = true,
-            validFromEpochMs = current!!.validFromMs, validUntilEpochMs = current!!.validUntilMs
+            validFromEpochMs = current!!.validFromMs, validUntilEpochMs = current!!.validUntilMs,
+            sourceRef = current!!.sourceRef
         )
         return SignDecision(zone, speed, upcoming, conflict)
     }
