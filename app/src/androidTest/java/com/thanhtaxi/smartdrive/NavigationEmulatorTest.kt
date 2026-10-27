@@ -55,6 +55,31 @@ class NavigationEmulatorTest {
             nav.observe(NavigationFix(21.0,106.0003,100.0,1000),1000).phase)
     }
 
+    @Test fun etaAndVoicePromptPolicyRunInRealAndroidJvmWithSyntheticFixes() {
+        val nav=ActiveNavigationEngine(graph)
+        nav.start(graph.route("A","C")!!)
+        val a=nav.observe(NavigationFix(21.0,106.0002,3.0,1000,90.0,7.0),1000)
+        val b=nav.observe(NavigationFix(21.0,106.00045,3.0,2000,90.0,7.0),2000)
+        assertNull(a.etaSeconds)
+        assertNotNull(b.etaSeconds)
+        val policy=GuidancePromptPolicy()
+        assertNotNull(policy.next(b,"emulator-fixture"))
+        assertNull(policy.next(b,"emulator-fixture"))
+        assertEquals(NavigationPhase.GPS_UNCERTAIN,
+            nav.observe(NavigationFix(21.0,106.00045,3.0,3000,90.0,7.0,true),3000).phase)
+    }
+
+    @Test fun offlineVietnameseTtsAdapterToleratesMissingLanguagePack() {
+        // Doesn't assume a Vietnamese voice is installed on the emulator.
+        // A non-network voice is required and absence must be safe.
+        val speaker=LocalVietnameseGuidance(
+            InstrumentationRegistry.getInstrumentation().targetContext)
+        speaker.stop()
+        speaker.speak("Thử nghiệm")
+        speaker.close()
+        assertFalse(speaker.available)
+    }
+
     @Test fun mainDashboardCreatesWithoutRealGpsHardware() {
         // Validates the Android Activity, map widget and dashboard lifecycle on
         // the emulator; offline tiles and GPS measurement are tested separately.
