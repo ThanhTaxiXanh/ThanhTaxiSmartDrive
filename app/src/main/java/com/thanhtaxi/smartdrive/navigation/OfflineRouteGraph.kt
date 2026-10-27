@@ -8,10 +8,13 @@ data class RouteNode(val id: String, val lat: Double, val lon: Double,
                      val displayName: String? = null)
 data class RouteEdge(
     val id: String, val from: String, val to: String,
-    val segmentId: String, val metres: Double, val reviewed: Boolean
+    val segmentId: String, val metres: Double, val reviewed: Boolean,
+    val access: SurveyAccessRule = SurveyAccessRule()
 )
-data class AllowedTurn(val fromEdge: String, val viaNode: String, val toEdge: String, val reviewed: Boolean)
-data class RoutePlan(val nodeIds: List<String>, val edgeIds: List<String>, val metres: Double)
+data class AllowedTurn(val fromEdge: String, val viaNode: String, val toEdge: String,
+                       val reviewed: Boolean, val access: SurveyAccessRule = SurveyAccessRule())
+data class RoutePlan(val nodeIds: List<String>, val edgeIds: List<String>, val metres: Double,
+                     val accessContext: RouteAccessContext? = null)
 
 /** No geometric intersection is treated as a junction unless it is explicitly in the graph. */
 class OfflineRouteGraph(
@@ -23,6 +26,7 @@ class OfflineRouteGraph(
     private val outgoing: Map<String, List<RouteEdge>>
     private val edgesById: Map<String, RouteEdge>
     private val allowed: Set<Pair<String, String>>
+    private val rulesByTurn: Map<Pair<String, String>, SurveyAccessRule>
     private val validatedSegmentTransitions: Set<Pair<String,String>>
 
     init {
@@ -40,6 +44,9 @@ class OfflineRouteGraph(
             it.metres.isFinite() && it.metres in 2.0..3000.0 })
         val edgeById = edges.associateBy { it.id }
         edgesById = edgeById
+        require(turns.distinctBy { it.fromEdge to it.toEdge }.size==turns.size) {
+            "Duplicate directed turn"
+        }
         require(turns.all {
             val before = edgeById[it.fromEdge]
             val after = edgeById[it.toEdge]
@@ -51,9 +58,15 @@ class OfflineRouteGraph(
             it.reviewed && edgeById[it.fromEdge]?.reviewed == true &&
                 edgeById[it.toEdge]?.reviewed == true
         }.map { it.fromEdge to it.toEdge }.toSet()
+        rulesByTurn=turns.asSequence().filter {
+            (it.fromEdge to it.toEdge) in allowed
+        }.associate { (it.fromEdge to it.toEdge) to it.access }
+        // A context-free road-matching gate must not assert a conditional turn.
         validatedSegmentTransitions = allowed.mapNotNull { (from, to) ->
             val prior=edgeById[from] ?: return@mapNotNull null
             val next=edgeById[to] ?: return@mapNotNull null
+            if(prior.access.conditional || next.access.conditional ||
+                rulesByTurn[from to to]?.conditional==true) return@mapNotNull null
             prior.segmentId to next.segmentId
         }.toSet()
     }
@@ -68,16 +81,22 @@ class OfflineRouteGraph(
 
     /** Returns the surveyed directed edge for route-preview generation only. */
     fun edge(id: String): RouteEdge? = edgesById[id]
-    fun hasReviewedTurn(previousEdge: String, nextEdge: String): Boolean =
-        (previousEdge to nextEdge) in allowed
+    fun hasReviewedTurn(previousEdge: String, nextEdge: String,
+                        context: RouteAccessContext? = null): Boolean =
+        (previousEdge to nextEdge) in allowed &&
+            rulesByTurn[previousEdge to nextEdge]?.permits(context)==true
+
+    fun isEdgeAllowed(id: String, context: RouteAccessContext? = null): Boolean =
+        edgesById[id]?.let { it.reviewed && it.access.permits(context) }==true
 
     /**
      * Dijkstra over (node, preceding directed edge). Every intermediate turn
      * needs an explicit allowlist entry. No optimistic turn assumptions.
      */
-    fun route(start: String, finish: String): RoutePlan? {
+    fun route(start: String, finish: String,
+              context: RouteAccessContext? = null): RoutePlan? {
         if (start !in nodes || finish !in nodes) return null
-        if (start == finish) return RoutePlan(listOf(start), emptyList(), 0.0)
+        if (start == finish) return RoutePlan(listOf(start), emptyList(), 0.0,context)
         data class State(val node: String, val incoming: String?)
         data class Entry(val cost: Double, val state: State)
         val first = State(start, null)
@@ -101,10 +120,13 @@ class OfflineRouteGraph(
                     cursor = predecessor[cursor] ?: return null
                     reversedNodes.add(cursor.node)
                 }
-                return RoutePlan(reversedNodes.asReversed(), reversedEdges.asReversed(), cost)
+                return RoutePlan(reversedNodes.asReversed(), reversedEdges.asReversed(),
+                    cost,context)
             }
             for (edge in outgoing[state.node].orEmpty()) {
-                if (state.incoming != null && (state.incoming to edge.id) !in allowed) continue
+                if(!edge.access.permits(context)) continue
+                if(state.incoming!=null && !hasReviewedTurn(state.incoming,edge.id,context))
+                    continue
                 val next = State(edge.to, edge.id)
                 val newCost = cost + edge.metres
                 if (newCost + 1e-7 < (best[next] ?: Double.POSITIVE_INFINITY)) {
