@@ -5,6 +5,8 @@ import android.app.AlertDialog
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.content.Intent
+import com.thanhtaxi.smartdrive.MainActivity
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -150,6 +152,39 @@ class RoutePreviewActivity : Activity() {
         buttons.addView(run,LinearLayout.LayoutParams(0,-2,1f))
         buttons.addView(detailButton,LinearLayout.LayoutParams(0,-2,1f))
         controls.addView(buttons)
+        val navigateButton=Button(this).apply {
+            text="Bắt đầu theo tuyến thử (GPS thật)"
+            isEnabled=false
+        }
+        controls.addView(navigateButton)
+        navigateButton.setOnClickListener {
+            val p=latestPlan ?:return@setOnClickListener
+            if(p.edgeIds.isEmpty()) return@setOnClickListener
+            // The prototype's GPS speed reading is a guard, not vehicle gear state.
+            val fix=lastValidParkedFix
+            if(fix!=null && ParkedGpsQuality.check(fix,SystemClock.elapsedRealtime())==
+                ParkedGpsDecision.MOVING_STOP) {
+                Toast.makeText(this,"Xe có dấu hiệu di chuyển: không thao tác khởi hành.",Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            AlertDialog.Builder(this)
+                .setTitle("Bắt đầu theo dõi tuyến THỬ NGHIỆM?")
+                .setMessage("Chỉ khởi tạo khi đã đỗ xe an toàn. Tên đường, lượt rẽ, " +
+                    "chiều đường và hạn chế phương tiện chưa được chứng nhận. " +
+                    "Màn hình sẽ theo dõi tiến độ GPS, tạm ẩn hướng dẫn khi không chắc chắn; " +
+                    "không tự chuyển sang đường khác. Không thao tác khi đang lái.")
+                .setNegativeButton("Hủy",null)
+                .setPositiveButton("Tôi đang đỗ, bắt đầu") { _,_ ->
+                    stopParkedGps("Đã chuyển sang Dashboard.")
+                    startActivity(Intent(this,MainActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        putStringArrayListExtra("navigationNodes",ArrayList(p.nodeIds))
+                        putStringArrayListExtra("navigationEdges",ArrayList(p.edgeIds))
+                        putExtra("navigationMeters",p.metres)
+                    })
+                    finish()
+                }.show()
+        }
         val testCoordinates=EditText(this).apply {
             hint="Tọa độ mô phỏng GPS: vĩ độ,kinh độ (ví dụ 21.0,106.0)"
             setSingleLine(true)
@@ -305,6 +340,7 @@ class RoutePreviewActivity : Activity() {
             simulatedStatus.text="Chỉ thử mô phỏng sau khi tính được tuyến khảo sát."
             run.isEnabled=false
             detailButton.isEnabled=false
+            navigateButton.isEnabled=false
             routeStatus.text="Đang tính đồ thị có hướng cục bộ…"
             background.execute {
                 val result=runCatching {
@@ -320,6 +356,7 @@ class RoutePreviewActivity : Activity() {
                     detailButton.isEnabled=p!=null
                     simulate.isEnabled=p!=null && p.edgeIds.isNotEmpty() &&
                         liveGpsListener==null
+                    navigateButton.isEnabled=p!=null && p.edgeIds.isNotEmpty()
                     routeStatus.text=when {
                         result.isFailure -> "Tuyến không hợp lệ: ${result.exceptionOrNull()?.message}"
                         p==null -> "Không có tuyến trên đồ thị đã nhập. Không kết luận đường thật bị chặn."
