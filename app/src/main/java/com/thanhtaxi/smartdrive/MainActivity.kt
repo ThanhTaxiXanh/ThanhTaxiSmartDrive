@@ -721,13 +721,18 @@ class MainActivity : Activity(), LocationListener {
         val routeVehicle=source.getStringExtra("routeVehicle")
         val routeDay=source.getIntExtra("routeDay",-1)
         val routeMinute=source.getIntExtra("routeMinute",-1)
+        val routeLane=source.getIntExtra("routeLane",-1)
+        val previewDeparture=source.getLongExtra("routeDepartureEpochMs",-1L)
         val routeContext=runCatching {
             if(routeVehicle==null) null else RouteAccessContext(
-                RoutingVehicle.valueOf(routeVehicle),routeDay,routeMinute)
+                RoutingVehicle.valueOf(routeVehicle),routeDay,routeMinute,
+                routeLane.takeIf { it in 1..12 })
         }.getOrNull()
         source.removeExtra("routeVehicle")
         source.removeExtra("routeDay")
         source.removeExtra("routeMinute")
+        source.removeExtra("routeLane")
+        source.removeExtra("routeDepartureEpochMs")
         val userOptedIn=source.getBooleanExtra("navigationVoiceOptIn",false)
         source.removeExtra("navigationVoiceOptIn")
         source.removeExtra("navigationNodes")
@@ -756,14 +761,37 @@ class MainActivity : Activity(), LocationListener {
             metres,refreshedContext)
         navWorker.execute {
             val nav=runCatching {
-                val total=copy.edgeIds.sumOf { id ->
+                // Re-plan at actual start time. A different route or stale
+                // preview is rejected; never silently substitute new turns.
+                val actualStart=System.currentTimeMillis()
+                val timed=if(previewDeparture>=0 && refreshedContext!=null) {
+                    require(kotlin.math.abs(actualStart-previewDeparture)<=5*60_000L) {
+                        "Đã quá 5 phút; cần tính lại ETA/tuyến khi xe đỗ"
+                    }
+                    graph.routeTimed(routeNodes.first(),routeNodes.last(),
+                        refreshedContext.vehicle,actualStart,refreshedContext.lane)?.also { p ->
+                        require(p.edgeIds==routeEdges && kotlin.math.abs(p.metres-metres)<0.25) {
+                            "Điều kiện giờ/làn đã đổi, phải tính lại tuyến"
+                        }
+                    } ?:throw IllegalArgumentException(
+                        "Không còn tuyến khảo sát phù hợp giờ/làn")
+                } else copy
+                require(!graph.hasLaneScopedRules(timed)) {
+                    "GPS không xác minh được làn; không bắt đầu hướng dẫn."
+                }
+                val total=timed.edgeIds.sumOf { id ->
                     val e=requireNotNull(graph.edge(id))
-                    require(graph.isEdgeAllowed(id,copy.accessContext))
+                    require(graph.isEdgeAllowed(id,
+                        if(timed.schedule.isEmpty())timed.accessContext
+                        else RouteAccessContext.atVietnamTime(
+                            requireNotNull(timed.accessContext).vehicle,
+                            timed.schedule[timed.edgeIds.indexOf(id)].enterEpochMs,
+                            timed.accessContext.lane)))
                     e.metres
                 }
-                require(kotlin.math.abs(total-copy.metres)<0.25)
-                RoutePreviewInstructions.generate(graph,copy)
-                ActiveNavigationEngine(graph).also { it.start(copy) }
+                require(kotlin.math.abs(total-timed.metres)<0.25)
+                RoutePreviewInstructions.generate(graph,timed)
+                ActiveNavigationEngine(graph).also { it.start(timed) }
             }
             runOnUiThread {
                 if(isFinishing || isDestroyed || generation!=navGeneration) return@runOnUiThread
@@ -773,7 +801,7 @@ class MainActivity : Activity(), LocationListener {
                         Toast.LENGTH_LONG).show()
                 } else {
                     activeNavigation=nav.getOrThrow()
-                    navRoute=copy
+                    navRoute=activeNavigation!!.activeRoute
                     navUpdate=activeNavigation!!.current
                     voiceRequested=userOptedIn
                     if(voiceRequested) offlineVoice=LocalVietnameseGuidance(this)
