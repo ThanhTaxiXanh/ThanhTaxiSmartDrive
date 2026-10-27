@@ -75,8 +75,12 @@ class OfflinePoiRepository(private val context: Context) {
                 require(it.moveToFirst())
                 val count = it.getInt(0)
                 require(count in 1..1_000_000) { "Số địa điểm không hợp lệ" }
-                db.rawQuery("SELECT rowid FROM pois_fts WHERE pois_fts MATCH ? LIMIT 1",
-                    arrayOf("\"test\"*")).use { /* Check on-device FTS5 availability. */ }
+                db.rawQuery("SELECT rowid FROM pois_fts WHERE pois_fts MATCH ? " +
+                    "ORDER BY bm25(pois_fts) LIMIT 1",
+                    arrayOf("\"test\"*")).use {
+                    // Force lazy cursor evaluation so import fails if FTS5 is unavailable.
+                    it.moveToFirst()
+                }
                 db.rawQuery("SELECT count(*) FROM poi_geo", null).use { geo ->
                     require(geo.moveToFirst() && geo.getInt(0) == count) { "RTree không đồng bộ" }
                 }
