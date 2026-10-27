@@ -1,0 +1,51 @@
+import unittest
+from tools.survey_routing_qa import inspect_routing
+
+def sample():
+    roads={
+        "s1":{"from":[21.0,106.0],"to":[21.001,106.0],"reviewed":True},
+        "s2":{"from":[21.001,106.0],"to":[21.001,106.001],"reviewed":True}
+    }
+    routing={
+        "nodes":[{"id":"A","lat":21.0,"lon":106.0},
+                 {"id":"B","lat":21.001,"lon":106.0},
+                 {"id":"C","lat":21.001,"lon":106.001}],
+        "edges":[
+            {"id":"ab","fromNode":"A","toNode":"B","segmentId":"s1",
+             "direction":"forward","distanceMeters":111.2,"reviewed":True,"sourceRef":"field-a"},
+            {"id":"bc","fromNode":"B","toNode":"C","segmentId":"s2",
+             "direction":"forward","distanceMeters":104.5,"reviewed":True,"sourceRef":"field-b"}
+        ],
+        "allowedTurns":[{"fromEdge":"ab","viaNode":"B","toEdge":"bc",
+                         "reviewed":True,"sourceRef":"turn-survey"}]
+    }
+    return routing,roads
+
+def errors(routing,roads):
+    found=[]
+    inspect_routing(routing,roads,lambda level,key,message:found.append((level,key,message)))
+    return found
+
+class SurveyRoutingQaTests(unittest.TestCase):
+    def test_valid_structural_route(self):
+        g,r=sample()
+        self.assertEqual([],errors(g,r))
+    def test_turn_does_not_exist_through_overpass(self):
+        g,r=sample()
+        g["allowedTurns"][0]["viaNode"]="C"
+        self.assertTrue(errors(g,r))
+    def test_missing_source_ref(self):
+        g,r=sample()
+        g["allowedTurns"][0]["sourceRef"]=""
+        self.assertTrue(any("sourceRef" in e[2] for e in errors(g,r)))
+    def test_reverse_edge_cannot_use_forward_endpoints(self):
+        g,r=sample()
+        g["edges"][0]["direction"]="reverse"
+        self.assertTrue(errors(g,r))
+    def test_self_reported_turn_with_unreviewed_edge_rejected(self):
+        g,r=sample()
+        g["edges"][0]["reviewed"]=False
+        self.assertTrue(any("unreviewed" in e[2] for e in errors(g,r)))
+
+if __name__ == "__main__":
+    unittest.main()

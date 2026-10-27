@@ -8,6 +8,7 @@ import math
 from pathlib import Path
 
 from tools.road_pack_builder import haversine
+from tools.survey_routing_qa import inspect_routing
 
 MAX_SEGMENTS = 100000
 MAX_SIGNS = 25000
@@ -66,6 +67,8 @@ def inspect_pack(pack: dict) -> dict:
         if sign.get("kind") not in ("R_420", "R_421", "P_127", "END_SPEED"):
             add("error", ident, "Unknown traffic sign kind")
         indexed.setdefault(segment, []).append(sign)
+
+    inspect_routing(pack.get("routing"),by_id,add)
 
     # Nearby contradictory signs on the same directional segment warrant review.
     comparison_budget = 200_000
