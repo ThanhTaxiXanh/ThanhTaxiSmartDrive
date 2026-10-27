@@ -127,6 +127,7 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
                              val roadBearing:Double)
         val candidates=ArrayList<Candidate>()
         var nearest=Double.POSITIVE_INFINITY
+        var headingRejected=false
         for(i in plan.edgeIds.indices) {
             val edge=graph.edge(plan.edgeIds[i]) ?:return suspendForUncertainGps()
             val a=graph.nodes[edge.from] ?:return suspendForUncertainGps()
@@ -143,7 +144,10 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
             val roadBearing=GeoMath.bearing(line)
             if(fix.speedMetersPerSecond!=null && fix.speedMetersPerSecond>=2.5 &&
                 fix.bearingDegrees!=null &&
-                GeoMath.differenceDegrees(fix.bearingDegrees,roadBearing)>70.0) continue
+                GeoMath.differenceDegrees(fix.bearingDegrees,roadBearing)>70.0) {
+                headingRejected=true
+                continue
+            }
             candidates.add(Candidate(i,position.crossTrackMeters,
                 position.progressMeters / position.lengthMeters * edge.metres,roadBearing))
         }
@@ -163,7 +167,8 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
             sorted.size>1 && sorted[1].cross-sorted[0].cross<8.0 -> null
             else -> sorted[0]
         }
-        if(chosen==null && sorted.isNotEmpty()) return suspendForUncertainGps()
+        if(chosen==null && (sorted.isNotEmpty() || headingRejected))
+            return suspendForUncertainGps()
         if(chosen==null) {
             arrivalStreak=0
             offRouteStreak++
