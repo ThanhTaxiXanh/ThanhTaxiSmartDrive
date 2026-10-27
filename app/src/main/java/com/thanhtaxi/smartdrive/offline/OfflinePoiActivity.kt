@@ -1,6 +1,8 @@
 package com.thanhtaxi.smartdrive.offline
 
 import android.app.Activity
+import android.app.AlertDialog
+import com.thanhtaxi.smartdrive.navigation.RoutePreviewActivity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -100,12 +102,25 @@ class OfflinePoiActivity : Activity() {
                                 "${place.lat}, ${place.lon} • Nguồn: ${place.source} " +
                                 "(${if (place.verifiedBySupplier) "Bên cấp đánh dấu đã xem xét" else "Chưa xác minh"})"
                             setOnClickListener {
-                                val clip = "${place.lat},${place.lon}"
-                                (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
-                                    .setPrimaryClip(ClipData.newPlainText("POI offline", clip))
-                                Toast.makeText(this@OfflinePoiActivity,
-                                    "Đã sao chép tọa độ; cần tuyến khảo sát để định tuyến.",
-                                    Toast.LENGTH_LONG).show()
+                                AlertDialog.Builder(this@OfflinePoiActivity)
+                                    .setTitle(place.name)
+                                    .setItems(arrayOf("Sao chép tọa độ",
+                                        "Xem thử tuyến khảo sát tới vị trí này")) { _, which ->
+                                        if (which == 0) {
+                                            val clip = "${place.lat},${place.lon}"
+                                            (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
+                                                .setPrimaryClip(ClipData.newPlainText("POI offline", clip))
+                                            Toast.makeText(this@OfflinePoiActivity,
+                                                "Đã sao chép tọa độ.", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            startActivity(Intent(this@OfflinePoiActivity,
+                                                RoutePreviewActivity::class.java).apply {
+                                                putExtra("verifiedStopped", true)
+                                                putExtra("previewDestinationCoordinate",
+                                                    "${place.lat},${place.lon}")
+                                            })
+                                        }
+                                    }.show()
                             }
                         })
                     }
