@@ -93,3 +93,14 @@ See [Phase 2 report](phase2/README.md). These checkmarks indicate
 
 See [real GPS pilot](phase2/REAL-GPS-DIAGNOSTIC.md) and
 [local point data contract](phase2/LOCAL-SEARCH-SCHEMA.md).
+
+### Active navigation / Android Emulator (2026-10-27)
+
+- [x] Foreground Dashboard trip state with user-approved launch from parked route preview
+- [x] Route polyline, remaining distance, upcoming geometry, 3-fix tentative arrival
+- [x] Conservative loss/heading/ambiguity/deviation handling, candidate alternate only
+- [x] JVM unit tests + Android Emulator API35 instrumentation workflow
+- [ ] Release-quality Android Auto and HMI integration, actual trip re-routing, ETA and voice
+- [ ] Independent legal/permitted turn evidence and real road benchmark (deferred physical QA)
+
+See [active navigation pilot](phase2/ACTIVE-NAVIGATION.md).

@@ -172,3 +172,20 @@ có nguồn và giấy phép; chưa có tìm địa chỉ toàn quốc.
 
 Đọc [giới hạn GPS thật](docs/phase2/REAL-GPS-DIAGNOSTIC.md) và
 [hợp đồng dữ liệu tên điểm](docs/phase2/LOCAL-SEARCH-SCHEMA.md).
+
+## Phase 2 — Điều hướng chủ động trên Dashboard (alpha)
+
+Khi đã đỗ xe, nhập road pack có `routing.nodes/edges/allowedTurns`,
+vào **Cài đặt → Tính thử tuyến**, chọn điểm xuất phát/đến và bấm
+**Bắt đầu theo tuyến thử (GPS thật)**. Dashboard sẽ hiện tuyến màu vàng,
+trạng thái theo GPS, khoảng cách còn lại và hình học điểm đổi hướng.
+**Dừng tuyến** kết thúc phiên; khi lệch tuyến, gợi ý đường thay thế chỉ
+được chấp nhận sau khi xe đỗ. GPS thiếu tin cậy sẽ tạm ẩn hướng dẫn.
+
+**Đây là alpha điều hướng**, chưa có tìm địa chỉ quốc gia, luật giao thông
+đã xác thực, ETA/giọng nói, tự tính lại tuyến khi đang chạy, Android Auto
+hay nghiệm thu thực địa. Không thay thế biển báo và quyết định của tài xế.
+
+- [Thiết kế và hướng dẫn active navigation](docs/phase2/ACTIVE-NAVIGATION.md)
+- [Android Emulator API35 workflow](.github/workflows/android-emulator.yml)
+- [Test và điều kiện nghiệm thu Phase2](docs/phase2/FIELD-TRIAL-PROTOCOL.md)

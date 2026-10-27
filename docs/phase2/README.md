@@ -84,3 +84,19 @@ live ETA/voice/location following/rerouting is implemented.
   This is **not** a licensed nationwide Vietnamese address/POI geocoder.
 - Self-reported `reviewed` route graph remains an alpha input, not evidence of
   road legality, turn rules, signal priority or route safety.
+
+## Active navigation milestone — 2026-10-27
+
+**Implemented in debug alpha**: Kotlin `ActiveNavigationEngine` with
+foreground Dashboard GPS route progress, future geometry-change text, trip
+status, conservative GPS ambiguity/stale handling, tentative arrival, surveyed
+graph polyline, stop button and parked-only explicit acceptance of an alternate.
+See [ACTIVE-NAVIGATION.md](ACTIVE-NAVIGATION.md).
+
+**Emulator tests**: added AndroidJUnitRunner + Android API 35 Github workflow
+and pure Kotlin unit tests. Emulator runtime validation status must come from
+the Actions run result; no real device evidence is implied.
+
+**Still outstanding**: accurate restricted-lane/turn aware routing datasets,
+national licensed address lookup, ETA, TTS, safe driving HMI, measured
+accuracy/performance, genuine field verification and Android Auto service.

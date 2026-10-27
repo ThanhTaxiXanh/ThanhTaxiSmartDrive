@@ -35,3 +35,18 @@ All tests must continue to pass on GitHub Actions. A passing test only verifies 
 | Duplicate timestamp / unreliable GPS / long gap | SurveyNavigationPreviewTest | No false confidence |
 | Alternate route from reviewed directed graph | SurveyNavigationPreviewTest | Only traversable approved edges and turns |
 | Route against direction | SurveyNavigationPreviewTest | No alternative |
+
+## New active engine state tests
+
+| Scenario | Test | Expected |
+|---|---|---|
+| Fresh GPS near routed edge | ActiveNavigationEngineTest | ACTIVE with remaining metres and geometry text |
+| Inaccurate/mocked/stale fix | ActiveNavigationEngineTest | GPS_UNCERTAIN |
+| GPS bearing strongly opposite edge | ActiveNavigationEngineTest | GPS_UNCERTAIN; never reroute on heading mismatch |
+| Parallel ambiguous candidates | ActiveNavigationEngineTest | Do not invent edge position |
+| Three fresh off-route fixes | ActiveNavigationEngineTest | OFF_ROUTE and **candidate** only |
+| User attempts candidate while moving | ActiveNavigationEngineTest | Not accepted |
+| User accepts when parked | ActiveNavigationEngineTest | Reacquire fresh GPS on new route |
+| Near destination 3 fixes | ActiveNavigationEngineTest | ARRIVED tentative |
+| Approved directed turn missing | ActiveNavigationEngineTest | Route rejected |
+| MainActivity on Android emulator | NavigationEmulatorTest | Activity launches; permission and pure engine smoke checks |
