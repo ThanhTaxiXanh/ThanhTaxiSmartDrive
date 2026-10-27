@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Bundle
 import android.widget.*
 import org.json.JSONObject
@@ -21,6 +22,19 @@ class OfflineMapsActivity : Activity() {
     private val watching = mutableMapOf<Long, OfflineRegion>()
     private val prefs by lazy { getSharedPreferences("taxi", MODE_PRIVATE) }
     private val parked by lazy { intent.getBooleanExtra("verifiedStopped", false) }
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onLost(network: android.net.Network) { runOnUiThread { pauseIfMetered() } }
+        override fun onCapabilitiesChanged(network: android.net.Network, capabilities: NetworkCapabilities) {
+            runOnUiThread { pauseIfMetered() }
+        }
+    }
+    private var monitoring = false
+    private fun pauseIfMetered() {
+        if (!unmeteredWifi()) {
+            watching.values.forEach { it.setDownloadState(OfflineRegion.STATE_INACTIVE) }
+            if (watching.isNotEmpty()) status.text = "Wi-Fi mất hoặc bị tính dung lượng: đã yêu cầu tạm dừng."
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -159,6 +173,29 @@ class OfflineMapsActivity : Activity() {
                 status.text = "Giới hạn tile: " + limit
             }
         })
+    }
+    override fun onStart() {
+        super.onStart()
+        try {
+            (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
+                .registerNetworkCallback(NetworkRequest.Builder().addTransportType(
+                    NetworkCapabilities.TRANSPORT_WIFI).build(), networkCallback)
+            monitoring = true
+        } catch (_: Exception) { monitoring = false }
+    }
+    override fun onStop() {
+        if (monitoring) {
+            (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
+                .unregisterNetworkCallback(networkCallback)
+            monitoring = false
+        }
+        // Downloads initiated by this screen must never continue unnoticed on mobile data.
+        watching.values.forEach { region ->
+            region.setDownloadState(OfflineRegion.STATE_INACTIVE)
+            region.setObserver(null)
+        }
+        watching.clear()
+        super.onStop()
     }
     override fun onDestroy() {
         watching.values.forEach { it.setObserver(null) }
