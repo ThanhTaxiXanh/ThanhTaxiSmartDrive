@@ -71,12 +71,13 @@ class OfflineMapsActivity : Activity() {
                     line.text = "Đang tải trạng thái gói #" + region.id
                     list.addView(line)
                     region.getStatus(object : OfflineRegion.OfflineRegionStatusCallback {
-                        override fun onStatus(s: OfflineRegionStatus) {
-                            line.text = "Gói #" + region.id + " — " +
+                        override fun onStatus(s: OfflineRegionStatus?) {
+                            line.text = if (s == null) "Gói #" + region.id + ": chưa có trạng thái"
+                            else "Gói #" + region.id + " — " +
                                 (if (s.isComplete) "HOÀN TẤT" else "CHƯA HOÀN TẤT") +
                                 " — " + s.completedResourceCount + "/" + s.requiredResourceCount
                         }
-                        override fun onError(error: String) { line.text = "Gói #" + region.id + ": " + error }
+                        override fun onError(error: String?) { line.text = "Gói #" + region.id + ": " + error }
                     })
                     val actions = LinearLayout(this@OfflineMapsActivity)
                     fun button(textValue: String, operation: () -> Unit) {
