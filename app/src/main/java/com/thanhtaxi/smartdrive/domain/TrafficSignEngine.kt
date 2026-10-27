@@ -29,11 +29,14 @@ class TrafficSignEngine {
     fun evaluate(context: RoadContext, progressMeters: Double, accuracyMeters: Double,
                  signs: List<LocatedRoadSign>, nowMs: Long): SignDecision {
         if (!context.gpsReliable || !context.matchedConfidently || context.segmentId == null ||
-            !progressMeters.isFinite() || !accuracyMeters.isFinite() || accuracyMeters > 20) {
+            !progressMeters.isFinite() || progressMeters < 0.0 ||
+            !accuracyMeters.isFinite() || accuracyMeters !in 0.0..20.0) {
             return SignDecision(context.zone, null, emptyList(), false)
         }
         val valid = signs.filter {
-            it.segmentId == context.segmentId && it.reviewed && it.confidence >= 0.9 &&
+            it.segmentId == context.segmentId && it.reviewed && !it.sourceRef.isNullOrBlank() &&
+            it.progressMeters.isFinite() && it.progressMeters >= 0.0 &&
+            it.confidence.isFinite() && it.confidence >= 0.9 &&
             (it.direction == null || it.direction == context.direction) &&
             (it.vehicle == null || it.vehicle == context.vehicle) &&
             (it.lane == null || it.lane == context.lane) &&

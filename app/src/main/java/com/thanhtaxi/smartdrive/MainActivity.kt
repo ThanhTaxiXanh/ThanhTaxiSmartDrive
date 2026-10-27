@@ -541,7 +541,7 @@ class MainActivity : Activity(), LocationListener {
         }
         signLabel.text = (if (pip.value == "--") "Giới hạn: -- ($evidenceLabel)"
             else "$evidenceLabel: ${pip.detail}") +
-            if (next.isNotBlank()) "\nSắp tới: $next" else ""
+            if (next.isNotBlank()) "\nBiển khảo sát sắp tới (CHƯA xác thực): $next" else ""
         gpsLabel.text = when {
             !fresh -> "Mất GPS / tín hiệu cũ"
             !accurate -> "GPS yếu: ${loc?.accuracy?.toInt()}m"
@@ -582,7 +582,8 @@ class MainActivity : Activity(), LocationListener {
         m.removeAnnotations(signMarkers)
         signMarkers.clear()
         val nearby = roadPack?.trafficSigns.orEmpty().asSequence()
-            .filter { it.reviewed && it.confidence >= 0.9 &&
+            .filter { it.reviewed && !it.sourceRef.isNullOrBlank() &&
+                it.confidence >= 0.9 &&
                 kotlin.math.abs(it.latitude - loc.latitude) < 0.015 &&
                 kotlin.math.abs(it.longitude - loc.longitude) < 0.020 }
             .mapNotNull { sign ->
