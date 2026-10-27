@@ -781,12 +781,7 @@ class MainActivity : Activity(), LocationListener {
                 }
                 val total=timed.edgeIds.sumOf { id ->
                     val e=requireNotNull(graph.edge(id))
-                    require(graph.isEdgeAllowed(id,
-                        if(timed.schedule.isEmpty())timed.accessContext
-                        else RouteAccessContext.atVietnamTime(
-                            requireNotNull(timed.accessContext).vehicle,
-                            timed.schedule[timed.edgeIds.indexOf(id)].enterEpochMs,
-                            timed.accessContext.lane)))
+                    require(e.reviewed)
                     e.metres
                 }
                 require(kotlin.math.abs(total-timed.metres)<0.25)
