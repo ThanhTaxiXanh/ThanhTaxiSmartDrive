@@ -244,8 +244,11 @@ class MainActivity : Activity(), LocationListener {
         catch (e: Exception) { gpsLabel.text = "GPS không sẵn sàng: ${e.message}" }
     }
     override fun onLocationChanged(location: Location) {
+        // Android can deliver old cached GPS fixes; never refresh their age to "now".
+        val ageNanos = SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos
+        if (ageNanos < -1_000_000_000L || ageNanos > 8_000_000_000L) return
         lastLocation = location
-        lastFixElapsedMs = SystemClock.elapsedRealtime()
+        lastFixElapsedMs = location.elapsedRealtimeNanos / 1_000_000L
         follow(location)
         renderNearbySigns(location)
         refreshData()

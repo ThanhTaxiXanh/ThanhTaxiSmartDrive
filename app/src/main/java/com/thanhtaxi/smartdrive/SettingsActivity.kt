@@ -7,6 +7,7 @@ import android.provider.Settings
 import android.widget.*
 import android.net.Uri
 import com.thanhtaxi.smartdrive.data.RoadPackRepository
+import com.thanhtaxi.smartdrive.offline.OfflineAreaCatalog
 import com.thanhtaxi.smartdrive.offline.OfflineMapsActivity
 
 class SettingsActivity : Activity() {
@@ -36,7 +37,7 @@ class SettingsActivity : Activity() {
         content.addView(styleInput)
         action("Lưu đường dẫn bản đồ") {
             val url = styleInput.text.toString().trim()
-            if (url.startsWith("https://")) {
+            if (OfflineAreaCatalog.validStyleUri(url)) {
                 prefs.edit().putString("style", url).apply()
                 Toast.makeText(this, "Đã lưu. Mở lại dashboard để áp dụng", Toast.LENGTH_SHORT).show()
             } else Toast.makeText(this, "Cần URL HTTPS", Toast.LENGTH_SHORT).show()
@@ -81,8 +82,17 @@ class SettingsActivity : Activity() {
         }
         action("Xem thông tin gói đang lưu") {
             val pack = RoadPackRepository(this).load()
-            Toast.makeText(this, if (pack == null) "Chưa có dữ liệu được nhập" else
-                "${pack.title}: ${pack.segments.size} đoạn, ${pack.signs.size} biển; nguồn: ${pack.source}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, if (pack == null) "Chưa có dữ liệu hợp lệ hoặc checksum lỗi" else
+                "${pack.title}, bộ ${pack.series} v${pack.version}: ${pack.segments.size} đoạn, " +
+                "${pack.trafficSigns.size} biển gắn tọa độ; nguồn: ${pack.source}", Toast.LENGTH_LONG).show()
+        }
+        action("Khôi phục bản dữ liệu trước (nếu bản mới sai)") {
+            try {
+                val pack = RoadPackRepository(this).restoreBackup()
+                Toast.makeText(this, "Đã khôi phục: ${pack.series} v${pack.version}", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(this,"Không thể khôi phục: ${e.message}",Toast.LENGTH_LONG).show()
+            }
         }
         heading("Media")
         action("Cấp quyền đọc phiên Media đang phát") {
@@ -105,7 +115,7 @@ class SettingsActivity : Activity() {
                     val json = contentResolver.openInputStream(uri)!!.bufferedReader().use { it.readText() }
                     require(json.length <= 10_000_000) { "Dung lượng gói quá lớn" }
                     val pack = RoadPackRepository(this).import(json)
-                    Toast.makeText(this, "Đã nhập ${pack.segments.size} đoạn. Chưa có xác minh pháp lý tự động.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "Đã nhập ${pack.segments.size} đoạn; SHA-256 lưu trên thiết bị. Không xác thực nguồn pháp lý.", Toast.LENGTH_LONG).show()
                 }
             }
         } catch (e: Exception) {

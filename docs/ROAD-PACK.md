@@ -9,6 +9,8 @@ bên tạo gói, **không** phải chứng nhận của cơ quan quản lý.
 ```json
 {
   "schema": 1,
+  "series": "demo-pilot",
+  "version": 1,
   "title": "TEST ONLY / KHÔNG DÙNG KHI LÁI XE",
   "source": "SYNTHETIC_TEST_NO_ROAD_SURVEY",
   "license": "Demo synthetic data",
@@ -70,3 +72,13 @@ cho phạm vi tối đa 800 m, tối đa 25 marker gần xe nhằm tránh rối 
 Giai đoạn tiếp theo phải có nhập dữ liệu OSM/khảo sát, đối soát hướng biển với road geometry, QA
 làn đường, kiểm tra giấy phép ODbL/nguồn riêng, phát hành gói versioned có chữ ký, kiểm tra hash
 và cơ chế rollback. Không dùng dữ liệu thử như dữ liệu pháp lý thật.
+
+## Kiểm tra toàn vẹn và phục hồi
+
+Gói JSON có `series` và `version` (số nguyên tăng dần theo cùng series). Ứng dụng tính SHA-256
+khi nhập vào lưu trữ riêng, so sánh lại SHA khi nạp và giữ **một bản trước đó** để người dùng
+khôi phục thủ công khi phát hiện dữ liệu mới sai. Phiên bản giảm trong cùng series bị từ chối,
+trừ thao tác khôi phục rõ ràng. SHA-256 ở đây phát hiện hỏng/tamper so với metadata cục bộ;
+**không** chứng minh gói được cấp bởi cơ quan nhà nước, khảo sát đúng hay số liệu hợp pháp.
+Bước sản xuất cần chữ ký số + khóa tin cậy riêng của đơn vị kiểm duyệt, kiểm tra giấy phép và
+tính hiệu lực pháp lý của văn bản.

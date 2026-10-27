@@ -10,7 +10,7 @@ Safe, offline-capable taxi navigation support in Vietnam; Android Phone Companio
 | 1 | Feasibility, architecture, product requirements, CI structure | implemented documentation |
 | 2 | GPS, map, speed, signs, routing, Free Drive | partial: GPS/map/free drive, conservative directional matching and geocoded signs; routing & verified nationwide signs missing |
 | 3 | 4-panel UI, settings, lunar calendar, QR, media, layout presets | partial: standard landscape layout, local settings/image/media; editor/events missing |
-| 4 | AI signs, validated offline road packs, downloadable offline tiles | not implemented |
+| 4 | AI signs, validated offline road packs, downloadable offline tiles | partial: small MapLibre offline region download manager + local SHA-256/version/rollback; AI and verified map packs missing |
 | 5 | Compliant Android Auto CarAppService and tests | not implemented |
 | 6 | QA, road surveys in Bắc Giang–Bắc Ninh, signed release | not implemented |
 
