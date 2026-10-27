@@ -37,6 +37,7 @@ class PmtilesManagerActivity : Activity() {
     private lateinit var consent: CheckBox
     private lateinit var choose: Button
     private lateinit var preview: Button
+    private lateinit var applyDashboard: Button
     private lateinit var mapView: MapView
     private lateinit var visibleTiles: CheckBox
     private lateinit var multipleZooms: CheckBox
@@ -95,6 +96,22 @@ class PmtilesManagerActivity : Activity() {
             setOnClickListener { showRaster() }
         }
         controls.addView(preview)
+        applyDashboard=Button(this).apply {
+            text="Dùng PMTiles raster này trên Dashboard"
+            isEnabled=false
+            setOnClickListener {
+                val archive=loaded
+                if(archive==null || !archive.header.isRaster) {
+                    message.text="Chỉ gói raster PNG/JPEG/WebP mới đặt làm bản đồ mặc định."
+                } else {
+                    getSharedPreferences("taxi",MODE_PRIVATE).edit()
+                        .putString("mapSourceMode","pmtiles_raster")
+                        .putString("pmtilesActiveSha",archive.sha256).apply()
+                    message.text="Đã chọn PMTiles raster làm nền Dashboard. Quay lại Dashboard để xem."
+                }
+            }
+        }
+        controls.addView(applyDashboard)
         text("Phiếu thử offline (người dùng tự quan sát; không phải chứng nhận tự động)")
         visibleTiles=CheckBox(this).apply {
             text="Tôi đã nhìn thấy tile đúng vị trí khi không có mạng"
@@ -132,6 +149,10 @@ class PmtilesManagerActivity : Activity() {
                     .setMessage("Chỉ xóa bản sao trong ứng dụng, không xóa tệp gốc của bạn.")
                     .setPositiveButton("Xóa") { _,_ ->
                         preview.isEnabled=false
+                        applyDashboard.isEnabled=false
+                        getSharedPreferences("taxi",MODE_PRIVATE).edit()
+                            .putString("mapSourceMode","online")
+                            .remove("pmtilesActiveSha").apply()
                         map?.setStyle(Style.Builder().fromJson(
                             """{"version":8,"sources":{},"layers":[]}"""))
                         executor.execute {
@@ -171,6 +192,7 @@ class PmtilesManagerActivity : Activity() {
                 loaded=archive
                 styleReady=false
                 preview.isEnabled=archive?.header?.isRaster==true
+                applyDashboard.isEnabled=archive?.header?.isRaster==true
                 message.text=if(archive==null) "Chưa có archive hợp lệ, hoặc checksum không khớp."
                     else "SHA-256: " + archive.sha256.take(16) + "… · " +
                         archive.header.formatName + " · z" + archive.header.minZoom + "–" +
@@ -210,6 +232,7 @@ class PmtilesManagerActivity : Activity() {
                     loaded=archive
                     styleReady=false
                     preview.isEnabled=archive.header.isRaster
+                    applyDashboard.isEnabled=archive.header.isRaster
                     message.text="Đã sao chép và xác minh cấu trúc: "+archive.header.formatName+
                         " · "+archive.file.length()/1024/1024+" MiB. SHA-256: "+archive.sha256+
                         ". Chưa kiểm tra chất lượng hoặc quyền pháp lý."

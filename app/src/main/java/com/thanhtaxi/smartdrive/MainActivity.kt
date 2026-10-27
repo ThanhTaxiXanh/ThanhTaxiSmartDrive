@@ -30,6 +30,11 @@ import com.thanhtaxi.smartdrive.data.RoadPack
 import com.thanhtaxi.smartdrive.data.RoadPackRepository
 import com.thanhtaxi.smartdrive.domain.*
 import com.thanhtaxi.smartdrive.media.MediaAccessService
+import com.thanhtaxi.smartdrive.offline.PmtilesArchiveStore
+import com.thanhtaxi.smartdrive.offline.PmtilesHeader
+import com.thanhtaxi.smartdrive.offline.PmtilesRasterStyle
+import org.maplibre.android.maps.Style
+import java.util.concurrent.Executors
 import org.maplibre.android.MapLibre
 import org.maplibre.android.annotations.Marker
 import org.maplibre.android.annotations.MarkerOptions
@@ -58,6 +63,12 @@ class MainActivity : Activity(), LocationListener {
     private lateinit var mediaLabel: TextView
     private lateinit var qrImage: ImageView
     private lateinit var qrNotice: TextView
+    private lateinit var mapStatusLabel: TextView
+    private val mapWorker = Executors.newSingleThreadExecutor()
+    private var selectedStyleKey: String? = null
+    private var currentStyleEpoch = 0
+    private var offlineHeader: PmtilesHeader? = null
+
     private var lastLocation: Location? = null
     private var lastFixElapsedMs = 0L
     private val handler = Handler(Looper.getMainLooper())
@@ -119,17 +130,15 @@ class MainActivity : Activity(), LocationListener {
         val mapPane = FrameLayout(this).apply { background = cardBackground() }
         mapView = MapView(this)
         mapPane.addView(mapView, FrameLayout.LayoutParams(-1,-1))
+        mapStatusLabel = label("Bản đồ: đang tải cấu hình…", 12f).apply {
+            setBackgroundColor(0xC9121720.toInt())
+            maxLines = 2
+        }
+        mapPane.addView(mapStatusLabel, FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM))
         mapView.onCreate(state)
-        mapView.getMapAsync { m ->
-            map = m
-            m.setStyle(prefs.getString("style", "https://demotiles.maplibre.org/style.json")!!) {
-                lastMarkerLocation = null
-                vehicleMarker = null
-                renderNearbySigns(lastLocation)
-                lastLocation?.let { follow(it) }
-            }
-            m.cameraPosition = CameraPosition.Builder().target(LatLng(21.033, 105.85)).zoom(12.0).build()
-            lastLocation?.let { follow(it) }
+        mapView.getMapAsync { readyMap ->
+            map = readyMap
+            loadSelectedMap()
         }
         val info = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -217,13 +226,75 @@ class MainActivity : Activity(), LocationListener {
             section.addView(right, LinearLayout.LayoutParams(-1,0,1f))
             val settings = Button(this).apply {
                 text = "Cài đặt / nhập dữ liệu (chỉ khi xe đỗ)"
-                setOnClickListener { if (isStopped()) startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
+                setOnClickListener { if (isStopped()) startActivity(Intent(this@MainActivity, SettingsActivity::class.java).putExtra("verifiedStopped", true))
                 else Toast.makeText(this@MainActivity,"Dừng xe trước khi cấu hình",Toast.LENGTH_SHORT).show() }
             }
             section.addView(settings)
             root.addView(section, LinearLayout.LayoutParams(-1,0,0.38f))
         }
         setContentView(root)
+    }
+    private fun loadSelectedMap() {
+        val m = map ?: return
+        val mode = prefs.getString("mapSourceMode","online") ?: "online"
+        val sha = prefs.getString("pmtilesActiveSha","") ?: ""
+        val url = prefs.getString("style","https://demotiles.maplibre.org/style.json")!!
+        val key = if(mode=="pmtiles_raster") "pmtiles:$sha" else "online:$url"
+        if(key==selectedStyleKey) return
+        selectedStyleKey=key
+        val epoch=++currentStyleEpoch
+        offlineHeader=null
+        if(mode!="pmtiles_raster") {
+            mapStatusLabel.text = "Bản đồ online: cần Internet và tile server đang hoạt động."
+            m.setStyle(url) {
+                if(epoch!=currentStyleEpoch) return@setStyle
+                lastMarkerLocation=null
+                vehicleMarker=null
+                renderNearbySigns(lastLocation)
+                lastLocation?.let { follow(it) } ?: run {
+                    m.cameraPosition=CameraPosition.Builder().target(LatLng(21.28,106.19)).zoom(12.0).build()
+                }
+            }
+            return
+        }
+        mapStatusLabel.text = "Đang kiểm tra SHA-256 gói PMTiles cục bộ…"
+        mapWorker.execute {
+            val archive=PmtilesArchiveStore(applicationContext).loadVerified()
+            runOnUiThread {
+                if(isFinishing || isDestroyed || epoch!=currentStyleEpoch) return@runOnUiThread
+                if(archive==null || !archive.header.isRaster || archive.sha256!=sha) {
+                    mapStatusLabel.text = "PMTiles không hợp lệ / chưa chọn raster. Vào Cài đặt để chọn bản đồ online."
+                    m.setStyle(Style.Builder().fromJson(
+                        """{"version":8,"sources":{},"layers":[]}"""))
+                    return@runOnUiThread
+                }
+                try {
+                    val selected=archive.header
+                    m.setStyle(Style.Builder().fromJson(PmtilesRasterStyle.make(archive))) {
+                        if(epoch!=currentStyleEpoch) return@setStyle
+                        offlineHeader=selected
+                        vehicleMarker=null
+                        lastMarkerLocation=null
+                        val fix=lastLocation
+                        val inside=fix!=null &&
+                            fix.latitude in selected.minLat..selected.maxLat &&
+                            fix.longitude in selected.minLon..selected.maxLon
+                        m.cameraPosition=CameraPosition.Builder()
+                            .target(if(inside) LatLng(fix!!.latitude,fix.longitude)
+                                else LatLng(selected.centerLat,selected.centerLon))
+                            .zoom(selected.centerZoom.toDouble().coerceIn(
+                                selected.minZoom.toDouble(),selected.maxZoom.toDouble())).build()
+                        mapStatusLabel.text=if(inside)
+                            "PMTiles raster cục bộ: chỉ trong vùng đã lưu (chưa kiểm thử tile)."
+                        else "GPS ngoài vùng PMTiles. Đang xem tâm vùng lưu (không phải vị trí xe)."
+                        renderNearbySigns(lastLocation)
+                        if(inside && fix!=null) follow(fix)
+                    }
+                } catch(e:Exception) {
+                    mapStatusLabel.text="Không mở được PMTiles: "+(e.message ?: "Sai cấu hình style")
+                }
+            }
+        }
     }
     private fun isStopped(): Boolean {
         val loc = lastLocation ?: return false
@@ -257,6 +328,12 @@ class MainActivity : Activity(), LocationListener {
     private fun follow(location: Location) {
         val m = map ?: return
         if (m.style == null) return
+        val local=offlineHeader
+        if(local!=null && (location.latitude !in local.minLat..local.maxLat ||
+                location.longitude !in local.minLon..local.maxLon)) {
+            mapStatusLabel.text="GPS ngoài phạm vi PMTiles: xem tâm vùng bản đồ đã nhập."
+            return
+        }
         if (location.hasAccuracy() && location.accuracy <= 40f) {
             vehicleMarker?.let { m.removeMarker(it) }
             vehicleMarker = m.addMarker(MarkerOptions()
@@ -266,7 +343,9 @@ class MainActivity : Activity(), LocationListener {
         }
         m.cameraPosition = CameraPosition.Builder()
             .target(LatLng(location.latitude, location.longitude))
-            .zoom(16.0).bearing(if (location.hasBearing()) location.bearing.toDouble() else 0.0)
+            .zoom(if(local==null) 16.0 else 16.0.coerceIn(
+                local.minZoom.toDouble(),local.maxZoom.toDouble()))
+            .bearing(if (location.hasBearing()) location.bearing.toDouble() else 0.0)
             .build()
     }
     private fun refreshData() {
@@ -400,6 +479,7 @@ class MainActivity : Activity(), LocationListener {
             RoadLine(it.id,it.startLat,it.startLon,it.endLat,it.endLon,it.reviewed)
         }
         roadIndex = RoadSpatialIndex(roadLines)
+        loadSelectedMap()
         lastMarkerLocation = null
         renderNearbySigns(lastLocation)
         requestGps(); handler.removeCallbacks(tick); handler.post(tick)
@@ -411,6 +491,8 @@ class MainActivity : Activity(), LocationListener {
     }
     override fun onStop() { mapView.onStop(); super.onStop() }
     override fun onDestroy() {
+        currentStyleEpoch++
+        mapWorker.shutdownNow()
         map?.removeAnnotations(signMarkers)
         signMarkers.clear()
         vehicleMarker?.let { map?.removeMarker(it) }
