@@ -31,6 +31,9 @@ class SurveyNavigationPreviewTest {
         assertEquals(listOf("Bến xe Bắc Ninh (A)"),
             SurveyPointSearch.suggestions(named,"Bến xe"))
         assertEquals("A",SurveyPointSearch.resolve(named,"Bến xe Bắc Ninh (A)").nodeId)
+        assertEquals("A",SurveyPointSearch.resolve(named,"Ben xe Bac Ninh").nodeId)
+        assertEquals(listOf("Bến xe Bắc Ninh (A)"),
+            SurveyPointSearch.suggestions(named,"ben xe bac ninh"))
         val dup=OfflineRouteGraph(listOf(RouteNode("A",21.0,106.0,"Bến xe"),
             RouteNode("B",21.0,106.01,"Bến xe")),emptyList(),emptyList())
         assertEquals(SurveyLookupStatus.AMBIGUOUS,

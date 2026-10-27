@@ -3,6 +3,8 @@ package com.thanhtaxi.smartdrive.navigation
 import com.thanhtaxi.smartdrive.domain.GeoMath
 import com.thanhtaxi.smartdrive.domain.RoadLine
 import kotlin.math.max
+import java.text.Normalizer
+import java.util.Locale
 
 /** Only IDs and surveyed coordinates, never an internet address/POI search. */
 enum class SurveyLookupStatus { EXACT_ID, NEAREST_NODE, AMBIGUOUS, NOT_FOUND, BAD_QUERY }
@@ -10,15 +12,21 @@ data class SurveyLookup(val nodeId: String?, val status: SurveyLookupStatus, val
 
 /** Deliberately refuses to snap to a distant or ambiguous surveyed node. */
 object SurveyPointSearch {
+    /** Accent-insensitive matching for user-provided local names, not geocoding. */
+    internal fun fold(input: String): String =
+        Normalizer.normalize(input.lowercase(Locale.ROOT)
+            .replace('đ','d'),Normalizer.Form.NFD)
+            .replace(Regex("\\p{M}+"),"").trim()
+
     fun suggestions(graph: OfflineRouteGraph, query: String, maxResults: Int = 8): List<String> {
         if (maxResults !in 1..20) return emptyList()
-        val q=query.trim()
+        val q=fold(query)
         if(q.isBlank()) return emptyList()
         return graph.nodes.values.asSequence()
-            .filter { it.id.contains(q,ignoreCase=true) ||
-                it.displayName?.contains(q,ignoreCase=true)==true }
-            .sortedWith(compareBy<RouteNode> { !it.id.startsWith(q,ignoreCase=true) &&
-                it.displayName?.startsWith(q,ignoreCase=true)!=true }
+            .filter { fold(it.id).contains(q) ||
+                it.displayName?.let { name -> fold(name).contains(q) }==true }
+            .sortedWith(compareBy<RouteNode> { !fold(it.id).startsWith(q) &&
+                it.displayName?.let { name -> fold(name).startsWith(q) }!=true }
                 .thenBy { it.id.length }.thenBy { it.id })
             .map { node ->
                 if(node.displayName.isNullOrBlank()) node.id
@@ -39,9 +47,9 @@ object SurveyPointSearch {
         }
         if(idFromLabel!=null) return SurveyLookup(idFromLabel.id,
             SurveyLookupStatus.EXACT_ID,"Tên điểm từ gói khảo sát đã nhập; chưa xác thực địa chỉ.")
+        val folded=fold(q)
         val named=graph.nodes.values.filter {
-            !it.displayName.isNullOrBlank() &&
-                q.equals(it.displayName,ignoreCase=true)
+            !it.displayName.isNullOrBlank() && folded==fold(it.displayName)
         }
         if(named.size==1) return SurveyLookup(named[0].id,
             SurveyLookupStatus.EXACT_ID,"Tên điểm từ gói khảo sát đã nhập; chưa xác thực địa chỉ.")
