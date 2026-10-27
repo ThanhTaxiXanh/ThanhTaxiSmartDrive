@@ -21,6 +21,7 @@ class OfflineRouteGraph(
     val nodes: Map<String, RouteNode>
     private val outgoing: Map<String, List<RouteEdge>>
     private val allowed: Set<Pair<String, String>>
+    private val validatedSegmentTransitions: Set<Pair<String,String>>
 
     init {
         require(nodes.size <= 20_000 && edges.size <= 40_000 && turns.size <= 80_000)
@@ -44,7 +45,20 @@ class OfflineRouteGraph(
             it.reviewed && edgeById[it.fromEdge]?.reviewed == true &&
                 edgeById[it.toEdge]?.reviewed == true
         }.map { it.fromEdge to it.toEdge }.toSet()
+        validatedSegmentTransitions = allowed.mapNotNull { (from, to) ->
+            val prior=edgeById[from] ?: return@mapNotNull null
+            val next=edgeById[to] ?: return@mapNotNull null
+            prior.segmentId to next.segmentId
+        }.toSet()
     }
+
+    /**
+     * Only a recorded, reviewed edge-to-edge junction allows switching the
+     * matched segment. A visual crossing of two roads is never sufficient.
+     */
+    fun isValidatedSegmentTransition(fromSegmentId: String, toSegmentId: String): Boolean =
+        fromSegmentId == toSegmentId ||
+            (fromSegmentId to toSegmentId) in validatedSegmentTransitions
 
     /**
      * Dijkstra over (node, preceding directed edge). Every intermediate turn

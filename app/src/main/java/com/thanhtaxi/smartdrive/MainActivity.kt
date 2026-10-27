@@ -88,6 +88,7 @@ class MainActivity : Activity(), LocationListener {
     private var displayedImageUri: String? = null
     private val matcher = GeoMatcher()
     private val stableMatcher = StableRoadMatcher()
+    private val topologyGate = RoadTopologyGate()
     private var stableMatch: RoadMatch? = null
     private val signEngine = TrafficSignEngine()
     private var roadPack: RoadPack? = null
@@ -449,7 +450,7 @@ class MainActivity : Activity(), LocationListener {
                 if(location.hasBearing()) location.bearing.toDouble() else null,
                 if(location.hasSpeed()) location.speed.toDouble() else null),roadIndex)
             else null
-        stableMatch = stableMatcher.observe(observedMatch,lastFixElapsedMs)
+        stableMatch = topologyGate.accept(stableMatcher.observe(observedMatch,lastFixElapsedMs))
         follow(location)
         renderNearbySigns(location)
         refreshData()
@@ -521,6 +522,8 @@ class MainActivity : Activity(), LocationListener {
         gpsLabel.text = when {
             !fresh -> "Mất GPS / tín hiệu cũ"
             !accurate -> "GPS yếu: ${loc?.accuracy?.toInt()}m"
+            segment == null && topologyGate.rejectedTransition ->
+                "GPS: hai đoạn không có lượt rẽ khảo sát được xác nhận"
             segment == null && stableMatcher.isConfirming ->
                 "GPS: đang xác nhận đoạn đường qua nhiều mẫu"
             segment == null -> "GPS tốt • Chưa có đoạn đường được xác minh"
@@ -609,6 +612,7 @@ class MainActivity : Activity(), LocationListener {
         }
         roadIndex = RoadSpatialIndex(roadLines)
         stableMatcher.reset()
+        topologyGate.reset(roadPack?.routeGraph)
         stableMatch=null
         if(offlineHeader?.tileType==1) labelSampler?.setEnabled(
             prefs.getBoolean("showOfflineRoadLabels",true))
@@ -622,6 +626,7 @@ class MainActivity : Activity(), LocationListener {
         labelSampler?.stop()
         handler.removeCallbacks(tick); locationManager.removeUpdates(this)
         stableMatcher.reset()
+        topologyGate.reset()
         stableMatch=null
         mapView.onPause(); super.onPause()
     }
