@@ -154,6 +154,25 @@ class MainActivity : Activity(), LocationListener {
         }
         mapView.getMapAsync { readyMap ->
             map = readyMap
+            readyMap.addOnMapClickListener { coordinate ->
+                // Road name inspection is only active when parked; tile properties
+                // are unverified OSM labels and never become speed-limit evidence.
+                if(!isStopped() || offlineHeader?.tileType != 1) {
+                    false
+                } else {
+                    val hits=runCatching {
+                        readyMap.queryRenderedFeatures(
+                            readyMap.projection.toScreenLocation(coordinate),"road-lines")
+                    }.getOrDefault(emptyList())
+                    val props=hits.firstOrNull()?.properties()?.entrySet()?.associate { entry ->
+                        entry.key to (if(entry.value.isJsonPrimitive) entry.value.asString else null)
+                    }.orEmpty()
+                    val msg=if(hits.isEmpty()) "Chạm sát nét đường để xem thông tin OSM."
+                        else com.thanhtaxi.smartdrive.offline.RoadFeatureSummary.bestDisplay(props)
+                    Toast.makeText(this,msg,Toast.LENGTH_LONG).show()
+                    true
+                }
+            }
             readyMap.addOnCameraMoveStartedListener { reason ->
                 if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
                     followCamera.userPanned()

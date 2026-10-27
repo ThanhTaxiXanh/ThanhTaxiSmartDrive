@@ -13,6 +13,8 @@ import android.os.Bundle
 import android.net.Uri
 import android.widget.*
 import android.graphics.Color
+import android.view.Gravity
+import android.widget.FrameLayout
 import java.util.concurrent.Executors
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
@@ -39,6 +41,7 @@ class PmtilesManagerActivity : Activity() {
     private lateinit var preview: Button
     private lateinit var vectorLayerInput: AutoCompleteTextView
     private lateinit var vectorStatus: TextView
+    private lateinit var tappedRoad: TextView
     private lateinit var applyDashboard: Button
     private lateinit var mapView: MapView
     private lateinit var visibleTiles: CheckBox
@@ -108,6 +111,9 @@ class PmtilesManagerActivity : Activity() {
             threshold=0
             setSingleLine(true)
             setOnClickListener { showDropDown() }
+        }
+        vectorLayerInput.setOnItemClickListener { _, _, _, _ ->
+            updateVectorFieldHint()
         }
         controls.addView(vectorLayerInput)
         controls.addView(Button(this).apply {
@@ -208,7 +214,17 @@ class PmtilesManagerActivity : Activity() {
             textSize=13f
         })
         mapView=MapView(this)
-        root.addView(mapView,LinearLayout.LayoutParams(-1,0,1f))
+        val mapContainer=FrameLayout(this)
+        mapContainer.addView(mapView,FrameLayout.LayoutParams(-1,-1))
+        tappedRoad=TextView(this).apply {
+            text="Chạm vào một đường vector khi xe đỗ để xem tên/mã tuyến trong OSM."
+            textSize=14f
+            setPadding(16,12,16,12)
+            setBackgroundColor(0xE5212B35.toInt())
+            setTextColor(Color.WHITE)
+        }
+        mapContainer.addView(tappedRoad,FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM))
+        root.addView(mapContainer,LinearLayout.LayoutParams(-1,0,1f))
         setContentView(root)
         mapView.onCreate(state)
         mapView.addOnDidFailLoadingMapListener { error ->
@@ -216,8 +232,26 @@ class PmtilesManagerActivity : Activity() {
             message.text="MapLibre không tải được tile/style: $details. " +
                 "Kiểm tra lớp, zoom và vùng phủ PMTiles."
         }
-        mapView.getMapAsync { m ->
-            map=m
+        mapView.getMapAsync { readyMap ->
+            map=readyMap
+            readyMap.addOnMapClickListener { coordinate ->
+                if(loaded?.header?.tileType != 1 || !styleReady) {
+                    false
+                } else {
+                    val hits=runCatching {
+                        readyMap.queryRenderedFeatures(
+                            readyMap.projection.toScreenLocation(coordinate),"road-lines")
+                    }.getOrDefault(emptyList())
+                    val attrs=hits.firstOrNull()?.properties()?.entrySet()?.associate { entry ->
+                        entry.key to (if(entry.value.isJsonPrimitive) entry.value.asString else null)
+                    }.orEmpty()
+                    tappedRoad.text=if(hits.isEmpty())
+                        "Chưa chọn trúng đường vector. Phóng to và chạm vào nét đường."
+                    else RoadFeatureSummary.bestDisplay(attrs) +
+                        "\nThông tin OSM chỉ để tham khảo, không xác nhận tốc độ hoặc hướng đi."
+                    true
+                }
+            }
         }
         inspectStored()
     }
@@ -305,11 +339,24 @@ class PmtilesManagerActivity : Activity() {
         vectorStatus.text = when {
             archive == null -> "Chưa có PMTiles."
             archive.header.tileType != 1 -> "Gói raster: không cần source-layer."
-            ids.isNotEmpty() -> "MVT vector có ${ids.size} lớp: ${ids.take(10).joinToString(", ")}. " +
-                "Chọn đúng lớp đường, không phải tên tự đặt."
+            ids.isNotEmpty() -> {
+                val current=vectorLayerInput.text.toString().trim()
+                val fields=info?.fieldsByLayer?.get(current).orEmpty()
+                "MVT vector có ${ids.size} lớp: ${ids.take(10).joinToString(", ")}. " +
+                "Thuộc tính của lớp đang chọn: " +
+                (if(fields.isEmpty()) "chưa khai báo" else fields.take(12).joinToString(", ")) +
+                ". Chạm đường trên bản đồ để xem tên/mã tuyến."
+            }
             else -> "Không tìm thấy lớp vector: " +
                 (info?.warning ?: "Metadata không đủ; chưa hỗ trợ giải nén.")
         }
+    }
+    private fun updateVectorFieldHint() {
+        val layer=vectorLayerInput.text.toString().trim()
+        val props=loaded?.vectorInfo?.fieldsByLayer?.get(layer).orEmpty()
+        vectorStatus.text="Lớp '$layer' có thuộc tính: " +
+            (if(props.isEmpty()) "metadata không khai báo" else props.take(16).joinToString(", ")) +
+            ". Chạm nét đường trên bản đồ để đọc thuộc tính tên."
     }
     private fun showVector() {
         val archive = loaded ?:run {
