@@ -15,9 +15,9 @@ Master Prompt Phase 2 requires map, GPS/Free Drive, road-aware speed limits, PIP
 | Sign awareness | `TrafficSignEngine` R.420/R.421/P.127/explicit survey end marker, directional segment matching, 800m upcoming preview | Code; legal applicability and current national coverage pending |
 | GPS road matching | Spatial index, heading/accuracy rejection, parallel-road ambiguity, 3 unique samples, reviewed turn topology | Code; bridges and intersections need field trial |
 | Source verification | User `reviewed=true` + `sourceRef` is **SURVEY_REPORTED**, not VERIFIED | Code; signed authoritative pack verifier not implemented |
-| Survey node/coordinate lookup | Case-insensitive node ID suggestions; exact ID or WGS84 near uniquely matched node ≤75m | ALPHA PARKED-ONLY; **not address/POI search** |
+| Survey node/name/coordinate lookup | Imported short displayName, unique node ID, WGS84 ≤75m; duplicate names/nearby ties rejected | ALPHA PARKED-ONLY; **not national geocoding** |
 | Map search/POI | No licensed Vietnamese address or POI geocoder | NOT IMPLEMENTED |
-| Route deviation and alternative preview | Three distinct consistent simulated fixes, uncertainty/ambiguity checks, candidate route only from surveyed nearby node with approved edge turns | ALPHA simulation **parked only**, NOT real GPS rerouting |
+| Route deviation and alternative preview | Three distinct synthetic fixes; new **opt-in foreground real GPS parked diagnostics** with strict age/speed/accuracy gating; surveyed candidate only | ALPHA parked-only; NOT navigation or moving-vehicle rerouting |
 | Production turn-by-turn, alternatives, ETA, rerouting, voice | No live turn instructions, licensed address search or rerouting in motion | NOT IMPLEMENTED |
 | Field/regulatory evidence | No independently inspected regional sign pack or road-trial record | NOT DONE |
 
@@ -73,3 +73,14 @@ edge and turn flags (not legal validation).
 
 Do not use this feature to issue instructions to a moving driver. No
 live ETA/voice/location following/rerouting is implemented.
+
+## Latest Phase 2 pilot — 27 Oct 2026
+
+- [Real GPS read-only, foreground parked diagnostic](REAL-GPS-DIAGNOSTIC.md):
+  opt-in exact location, no tracking history; stops when GPS speed ≥0.8 m/s
+  or Activity pauses. Without reported speed it stays UNKNOWN.
+- [Local point names from surveyed licensed package](LOCAL-SEARCH-SCHEMA.md):
+  optional `routing.nodes[].displayName` search with strict ambiguity checks.
+  This is **not** a licensed nationwide Vietnamese address/POI geocoder.
+- Self-reported `reviewed` route graph remains an alpha input, not evidence of
+  road legality, turn rules, signal priority or route safety.

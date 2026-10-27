@@ -155,3 +155,20 @@ Sau khi tính tuyến thử, có thể nhập tọa độ *giả lập*, bấm
 **Xem tuyến khác**. Không kết nối với GPS thật để tự điều hướng, không có
 mệnh lệnh rẽ hay ETA tin cậy. Xem
 [giới hạn Phase 2](docs/phase2/README.md).
+
+## Phase 2 — GPS thật chỉ để kiểm tra lúc đỗ xe
+
+Trong **Cài đặt → Tính thử tuyến**, sau khi nhập `road pack` chứa
+`routing.nodes` và tính tuyến, bạn có thể chọn **Bật GPS thật (khi đỗ)**.
+Ứng dụng hỏi quyền vị trí chính xác, không ghi lịch sử, tự tắt khi rời
+màn hình hoặc GPS phát hiện tốc độ ≥0,8 m/s. Chỉ khi mẫu GPS đủ mới,
+chính xác và có tốc độ thấp, nút **Điểm đi = GPS** mới hoạt động.
+
+Lưu ý đây là **chẩn đoán khi xe đã đỗ**, không phải chế độ theo dõi rẽ
+đường khi đang lái. Nếu GPS không cung cấp tốc độ, ứng dụng giữ
+trạng thái chưa xác định; bạn có thể dùng chế độ mô phỏng riêng.
+Có thể tìm `displayName` nếu nó được người dùng đưa vào gói khảo sát
+có nguồn và giấy phép; chưa có tìm địa chỉ toàn quốc.
+
+Đọc [giới hạn GPS thật](docs/phase2/REAL-GPS-DIAGNOSTIC.md) và
+[hợp đồng dữ liệu tên điểm](docs/phase2/LOCAL-SEARCH-SCHEMA.md).

@@ -56,3 +56,19 @@ Suggested structured report (example, **no real data**):
 5. Explicit release/device matrix and QA evidence for all P2-F01–F14.
 
 No "100% Phase 2 done" may be claimed without satisfying these field and functional gates.
+
+## Additions for stationary live GPS pilot
+
+| ID | Device scenario | Required observation |
+|---|---|---|
+| P2-G01 | User opts in after parking; precise GPS granted | Foreground only; one active provider listener and explicit status |
+| P2-G02 | No `Location.hasSpeed` or accuracy exceeds 15m | UNKNOWN; no false on-route assertion |
+| P2-G03 | Fix stale by >5s / timestamp duplicated / mock provider | Reject and avoid false route confidence |
+| P2-G04 | GPS speed ≥0.8m/s | Stop read-only observer, clear last cached position |
+| P2-G05 | Activity paused, permission denied or provider disabled | Listener removed, no background tracking and no crash |
+| P2-G06 | Press Điểm đi = GPS at recent stationary fix | Select only unique local surveyed node ≤75m; no automatic route |
+| P2-G07 | Imported duplicate point names or ambiguous coordinate | Require explicit node ID; no fabricated address |
+| P2-G08 | Airplane mode, locally licensed road pack | Pure local read-only diagnostics; no implied tile/router availability |
+
+All these tests are **NOT YET EXECUTED** on a real device. Kotlin unit
+tests and Python QA verify only isolated logic, not platform lifecycle.

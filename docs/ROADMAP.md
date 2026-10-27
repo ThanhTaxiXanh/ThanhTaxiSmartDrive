@@ -79,3 +79,17 @@ The application is not a substitute for visual observation of signs and road con
 
 See [Phase 2 report](phase2/README.md). These checkmarks indicate
 **code-level capabilities, not field acceptance or completion of Phase 2**.
+
+### Stationary live GPS diagnostic (2026-10-27)
+
+- [x] Foreground-only opt-in GPS sample gate (fresh ≤5s, accuracy ≤15m,
+  reported speed below 0.8m/s, no mock provider)
+- [x] Automatic stop on movement and Activity background; no location trail
+  persistence; choose origin only from unique local surveyed node
+- [x] Optional short human-readable surveyed node names, duplicate refusal
+- [ ] Physical Android GPS permission/provider/accuracy lifecycle QA
+- [ ] Licensed full Vietnamese address/POI geocoder and search tests
+- [ ] Actual motion-aware navigation and safe automatic route recalculation
+
+See [real GPS pilot](phase2/REAL-GPS-DIAGNOSTIC.md) and
+[local point data contract](phase2/LOCAL-SEARCH-SCHEMA.md).
