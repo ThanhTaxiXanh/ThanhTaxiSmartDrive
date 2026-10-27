@@ -100,3 +100,14 @@ the Actions run result; no real device evidence is implied.
 **Still outstanding**: accurate restricted-lane/turn aware routing datasets,
 national licensed address lookup, ETA, TTS, safe driving HMI, measured
 accuracy/performance, genuine field verification and Android Auto service.
+
+## ETA and limited voice prompt prototype
+
+The active engine now exposes **ETA from a bounded moving-speed median**
+(unknown for missing, stationary, outlying or untrusted GPS), distance
+progress and next geometric maneuver index. The Dashboard shows time
+remaining and step n/m. Voice is **opt-in at parked route start**, defaults
+off, requires an installed offline Vietnamese voice and only describes the
+geometry of surveyed route changes; never implies permission to turn.
+Unit and Emulator tests cover these components. See
+[ETA-VOICE-TESTING.md](ETA-VOICE-TESTING.md).

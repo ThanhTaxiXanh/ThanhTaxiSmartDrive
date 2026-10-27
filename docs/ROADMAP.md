@@ -104,3 +104,14 @@ See [real GPS pilot](phase2/REAL-GPS-DIAGNOSTIC.md) and
 - [ ] Independent legal/permitted turn evidence and real road benchmark (deferred physical QA)
 
 See [active navigation pilot](phase2/ACTIVE-NAVIGATION.md).
+
+### ETA and Vietnamese offline commentary milestone (2026-10-27)
+
+- [x] Median GPS-speed ETA and confidence gating; step n/m in Dashboard
+- [x] Opt-in/off-by-default, offline-only Vietnamese TextToSpeech geometry commentary
+- [x] Prompt de-duplication and suspended speech on uncertain GPS
+- [x] Pure Kotlin scripted route replay; emulator TTS lifecycle smoke testing
+- [ ] Traffic-aware ETA and legally sourced turn-by-turn instruction data
+- [ ] Audible Vietnamese TTS confirmation on devices with installed local voices (deferred)
+
+Details: [Phase 2 ETA/voice](phase2/ETA-VOICE-TESTING.md).

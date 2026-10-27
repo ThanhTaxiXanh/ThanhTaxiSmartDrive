@@ -50,3 +50,15 @@ All tests must continue to pass on GitHub Actions. A passing test only verifies 
 | Near destination 3 fixes | ActiveNavigationEngineTest | ARRIVED tentative |
 | Approved directed turn missing | ActiveNavigationEngineTest | Route rejected |
 | MainActivity on Android emulator | NavigationEmulatorTest | Activity launches; permission and pure engine smoke checks |
+
+## New ETA/voice scripted replay cases
+
+| Scenario | Test | Expected |
+|---|---|---|
+| Two reliable moving GPS samples | EtaGuidanceTest / ActiveNavigationEngineTest | ETA becomes available |
+| One sample, stopped, too fast, missing or stale speed | EtaGuidanceTest | No ETA or voice |
+| Multiple ETA samples with one speed outlier | EtaGuidanceTest | Robust median instead of last-value jump |
+| Cross 150m and 40m upcoming geometry change | EtaGuidanceTest / ActiveNavigationReplayTest | One message per threshold, no duplicate |
+| Mock GPS, stale GPS or off-route | ActiveNavigationReplayTest | Guidance / ETA cleared |
+| Full scripted fictional A→B→C, near C three times | ActiveNavigationReplayTest | Tentative arrival and silent prompt |
+| TTS unavailable on Android emulator | NavigationEmulatorTest | Adapter safe shutdown, silence |

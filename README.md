@@ -189,3 +189,17 @@ hay nghiệm thu thực địa. Không thay thế biển báo và quyết địn
 - [Thiết kế và hướng dẫn active navigation](docs/phase2/ACTIVE-NAVIGATION.md)
 - [Android Emulator API35 workflow](.github/workflows/android-emulator.yml)
 - [Test và điều kiện nghiệm thu Phase2](docs/phase2/FIELD-TRIAL-PROTOCOL.md)
+
+## Phase 2 — ETA và mô tả tuyến bằng giọng Việt offline (thử nghiệm)
+
+Dashboard hiện tính **ETA ước lượng** từ khoảng cách đồ thị còn lại và vài
+mẫu tốc độ GPS hợp lệ. Nếu dữ liệu không tin cậy, ETA hiển thị `—`.
+Nhãn **Bước n/m** chỉ mô tả điểm đổi hướng trên đồ thị khảo sát.
+
+Khi xe đỗ, trên màn hình **Tính thử tuyến**, bạn có thể tích chọn
+**Phát mô tả điểm đổi hướng bằng tiếng Việt offline** trước khi bấm bắt
+đầu; mặc định tắt. Nếu thiết bị không có giọng tiếng Việt hoạt động
+offline, app không đọc tiếng và không tự chuyển sang TTS qua mạng.
+Giọng nói chỉ mô tả hình học thử nghiệm, không ra lệnh rẽ hợp pháp.
+
+Chi tiết: [ETA & giọng nói](docs/phase2/ETA-VOICE-TESTING.md).

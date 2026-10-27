@@ -8,7 +8,7 @@
 - The route uses a `routing.nodes` / `routing.edges` / `routing.allowedTurns` **directed** topology. `reviewed=true` is self-declared; imported sourceRef is not publisher authentication.
 - The chosen edge/node list and total metres are passed to the Dashboard; it validates *every edge*, sequence, reviewed status, reviewed directed turns and total metres before building `ActiveNavigationEngine`.
 - Uses the Dashboard's existing GPS provider (no new background location permission). The pure Kotlin engine follows fresh, non-mock, accurate fixes, analyzes heading against edge bearing, detects geometric progress and upcoming geometry changes. The route polyline and a conspicuous **ĐIỀU HƯỚNG THỬ** label are rendered on the independent Android Dashboard.
-- Displays estimated **distance remaining on the imported graph** and next geometry-change information; no ETA or voice.
+- Displays **distance remaining, tentative ETA from recent usable GPS speed**, step index and next geometric change. Voice commentary is parked opt-in only, Vietnamese offline voice required; no legally authoritative turn-by-turn spoken directions.
 - Rejects ambiguous parallel edges, stale fixes, improbable match-direction changes and jumps forward more than one edge. Three consecutive off-route GPS observations are required to make an **alternative route proposal**.
 - **No automatic reroute in traffic**. If a candidate exists, no turn instruction is emitted until the operator manually accepts it *while parked* using **Chọn tuyến khác (khi đỗ)**.
 - Three fresh fixes near the last surveyed node produce a tentative arrival status. Arrival is not proof of the passenger's actual destination.
@@ -35,8 +35,15 @@
 
 - Current route geometry is constructed from node-to-node line segments, not a full navigation-grade lane map or snapped OSM routing network.
 - No way to infer road restrictions, legal turning bans, time-of-day/vehicle rules, road grade/overpass, traffic, construction closures or official speed rules from user-reported `reviewed` tags.
-- No signed, independently verified road package; no licensed national geocoding or POI search, no ETA, alternatives optimization, voice/automated guidance, route saving or replay logging.
+- No signed, independently verified road package; no licensed national geocoding or POI search, no traffic-aware ETA, alternatives optimization, legally validated voice/automated guidance, route saving or replay logging.
 - The currently displayed geometry-change text is explicitly **not a legally authoritative driving instruction**.
 - Android Auto uses a separate approved navigation App Library template/service and cannot be substituted with the Dashboard Activity.
 
 **Completion gate for Phase 2** still includes true road-data validation and supported navigation tests. Passing emulator tests is *engineering evidence*, not field acceptance.
+
+
+## ETA & offline voice update
+
+See [ETA-VOICE-TESTING.md](ETA-VOICE-TESTING.md) for estimator bounds,
+strict offline Vietnamese TTS voice selection and the deterministic scripted
+GPS replay + Android Emulator instrumentation coverage.
