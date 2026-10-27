@@ -15,7 +15,8 @@ data class PmtilesArchive(
     val sourceName: String,
     val license: String,
     val attribution: String,
-    val vectorInfo: PmtilesVectorInfo? = null
+    val vectorInfo: PmtilesVectorInfo? = null,
+    val rootAudit: PmtilesRootAudit? = null
 ) {
     val tileUri: String get() = "pmtiles://file://" + file.absolutePath
 }
@@ -89,6 +90,7 @@ class PmtilesArchiveStore(private val context: Context) {
                 }
             }
             val header = parse(temp)
+            val rootAudit = PmtilesDirectoryAudit.inspect(temp)
             val hash = digestOf(temp)
             require(expected.isEmpty() || hash == expected) { "SHA-256 mismatches source checksum" }
             val target = File(folder,"$hash.pmtiles")
@@ -113,7 +115,7 @@ class PmtilesArchiveStore(private val context: Context) {
             }.getOrElse {
                 PmtilesVectorInfo(emptyList(),it.message ?: "Cannot inspect vector metadata")
             } else null
-            return PmtilesArchive(target,header,hash,source,terms,credit,vectorInfo)
+            return PmtilesArchive(target,header,hash,source,terms,credit,vectorInfo,rootAudit)
         } finally {
             temp.delete()
         }
@@ -128,6 +130,7 @@ class PmtilesArchiveStore(private val context: Context) {
         if (!file.isFile || file.length() != manifest.getLong("bytes")) return null
         if (digestOf(file) != hash) return null
         val h = parse(file)
+        val audit = PmtilesDirectoryAudit.inspect(file)
         val vectorInfo = if (h.tileType == 1) runCatching {
             PmtilesVectorMetadata.read(file)
         }.getOrElse {
@@ -135,7 +138,7 @@ class PmtilesArchiveStore(private val context: Context) {
         } else null
         PmtilesArchive(file,h,hash,
             manifest.getString("source"),manifest.getString("license"),
-            manifest.getString("attribution"),vectorInfo)
+            manifest.getString("attribution"),vectorInfo,audit)
     }.getOrNull()
 
     @Synchronized fun deleteActiveArchive(): Boolean {

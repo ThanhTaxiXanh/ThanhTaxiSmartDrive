@@ -237,7 +237,8 @@ class PmtilesManagerActivity : Activity() {
                     else "SHA-256: " + archive.sha256.take(16) + "… · " +
                         archive.header.formatName + " · z" + archive.header.minZoom + "–" +
                         archive.header.maxZoom +
-                        ". Đã kiểm tra checksum và header; chưa kiểm thử hiển thị tile."
+                        ". "+(archive.rootAudit?.summary ?: "Chưa kiểm tra root directory")+
+                        ". Chưa kiểm thử hiển thị tile."
             }
         }
     }
@@ -281,6 +282,7 @@ class PmtilesManagerActivity : Activity() {
                             archive.header.minLat,archive.header.minLon,
                             archive.header.maxLat,archive.header.maxLon)+
                         "; zoom "+archive.header.minZoom+"–"+archive.header.maxZoom+
+                        ". "+(archive.rootAudit?.summary ?: "Chưa kiểm tra root directory")+
                         ". Chưa xác minh tile và giấy phép thực tế."
                 }.onFailure { error ->
                     message.text="Không thể nhập PMTiles: "+(error.message ?: "Lỗi đọc tệp")
