@@ -78,6 +78,13 @@ class SurveyNavigationPreviewTest {
             monitor.observe(graph,plan,lat,106.0005,3.0,20000).state)
     }
 
+    @Test fun forgedPlanWithUnreviewedTurnCannotYieldRouteConfidence() {
+        val noTurn=OfflineRouteGraph(nodes,edges,emptyList())
+        val forged=RoutePlan(listOf("A","B","C"),listOf("ab","bc"),210.0)
+        val result=RouteDeviationMonitor().observe(noTurn,forged,21.0,106.0005,3.0,1000)
+        assertEquals(RouteDeviationState.UNKNOWN,result.state)
+    }
+
     @Test fun candidateRerouteCannotInventDirectedTurn() {
         val (point, reroute)=SurveyReroutePreview.candidate(graph,21.001,106.001,"C")
         assertEquals("D",point.nodeId)

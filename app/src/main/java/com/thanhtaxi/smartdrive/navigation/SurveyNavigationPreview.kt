@@ -108,7 +108,11 @@ class RouteDeviationMonitor(
         for (i in route.edgeIds.indices) {
             val edge=graph.edge(route.edgeIds[i]) ?:run { reset();return last }
             if(!edge.reviewed || edge.from!=route.nodeIds[i] ||
-                edge.to!=route.nodeIds[i+1]) { reset();return last }
+                edge.to!=route.nodeIds[i+1] ||
+                (i>0 && !graph.hasReviewedTurn(route.edgeIds[i-1],edge.id))) {
+                reset()
+                return last
+            }
             val a=graph.nodes[edge.from] ?:run { reset();return last }
             val b=graph.nodes[edge.to] ?:run { reset();return last }
             val projection=GeoMath.project(lat,lon,
