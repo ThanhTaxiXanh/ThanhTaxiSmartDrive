@@ -106,9 +106,8 @@ class RoutePreviewActivity : Activity() {
             setContentView(root)
             return
         }
-        val ids=g.nodes.values.sortedBy { it.id }.map { n ->
-            if(n.displayName.isNullOrBlank()) n.id else "${n.displayName} (${n.id})"
-        }
+        val search=OfflineDestinationIndex(g)
+        val ids=search.allLabels()
         fun choose(label:String): AutoCompleteTextView =
             AutoCompleteTextView(this).apply {
                 hint=label
@@ -122,9 +121,30 @@ class RoutePreviewActivity : Activity() {
         val finish=choose("ID/tên điểm khảo sát hoặc tọa độ đến")
         controls.addView(start)
         controls.addView(finish)
+        val vehicleChoices=RoutingVehicle.entries.map { it.name }
+        val vehiclePicker=Spinner(this).apply {
+            adapter=ArrayAdapter(this@RoutePreviewActivity,
+                android.R.layout.simple_spinner_dropdown_item,vehicleChoices)
+            setSelection(vehicleChoices.indexOf(RoutingVehicle.TAXI.name))
+        }
+        controls.addView(TextView(this).apply {
+            text="Loại phương tiện khảo sát giả lập (không phải xác minh đăng ký xe):"
+        })
+        controls.addView(vehiclePicker)
+        val laneLabels=listOf("Làn chưa rõ (mặc định)")+
+            (1..6).map { "Làn $it (giả lập)" }
+        val lanePicker=Spinner(this).apply {
+            adapter=ArrayAdapter(this@RoutePreviewActivity,
+                android.R.layout.simple_spinner_dropdown_item,laneLabels)
+        }
+        controls.addView(TextView(this).apply {
+            text="Làn khảo sát cho phép thử lọc tuyến; GPS không thể xác minh làn:"
+        })
+        controls.addView(lanePicker)
         routeStatus=TextView(this).apply {
-            text="Đã nạp ${ids.size} nút. Tìm theo ID, tên nút trong road pack hoặc WGS84 ≤75m. " +
-                "Không có cơ sở dữ liệu địa chỉ Việt Nam; tên điểm chưa xác minh độc lập."
+            text="Offline: ${g.nodes.size} nút + ${g.destinations.size} điểm tự khai. " +
+                "Tìm ID, tên/biệt danh có/không dấu, hoặc WGS84 ≤75m. " +
+                "Chưa có dữ liệu địa chỉ quốc gia."
             textSize=14f
             maxLines=3
         }
@@ -170,6 +190,12 @@ class RoutePreviewActivity : Activity() {
         navigateButton.setOnClickListener {
             val p=latestPlan ?:return@setOnClickListener
             if(p.edgeIds.isEmpty()) return@setOnClickListener
+            if(g.hasLaneScopedRules(p) || p.accessContext?.vehicle!=RoutingVehicle.TAXI) {
+                Toast.makeText(this,
+                    "Tuyến có giới hạn theo làn chưa kiểm chứng hoặc không phải taxi: " +
+                    "chỉ được xem mô phỏng khi xe đỗ.",Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
             // The prototype's GPS speed reading is a guard, not vehicle gear state.
             val fix=lastValidParkedFix
             if(fix!=null && ParkedGpsQuality.check(fix,SystemClock.elapsedRealtime())==
@@ -193,6 +219,9 @@ class RoutePreviewActivity : Activity() {
                         putStringArrayListExtra("navigationNodes",ArrayList(p.nodeIds))
                         putStringArrayListExtra("navigationEdges",ArrayList(p.edgeIds))
                         putExtra("navigationMeters",p.metres)
+                        putExtra("routeDepartureEpochMs",
+                            p.schedule.firstOrNull()?.enterEpochMs ?: -1L)
+                        putExtra("routeLane",p.accessContext?.lane?:-1)
                         p.accessContext?.let { context ->
                             putExtra("routeVehicle",context.vehicle.name)
                             putExtra("routeDay",context.dayOfWeek)
@@ -342,8 +371,8 @@ class RoutePreviewActivity : Activity() {
         }
         run.setOnClickListener {
             if(liveGpsListener!=null) stopParkedGps("Đã dừng GPS để chọn tuyến mới.")
-            val fromResult=SurveyPointSearch.resolve(g,start.text.toString())
-            val toResult=SurveyPointSearch.resolve(g,finish.text.toString())
+            val fromResult=search.resolve(start.text.toString())
+            val toResult=search.resolve(finish.text.toString())
             val origin=fromResult.nodeId
             val destination=toResult.nodeId
             if(origin==null || destination==null) {
@@ -360,11 +389,14 @@ class RoutePreviewActivity : Activity() {
             detailButton.isEnabled=false
             navigateButton.isEnabled=false
             routeStatus.text="Đang tính đồ thị có hướng cục bộ…"
+            val selectedVehicle=RoutingVehicle.valueOf(
+                vehicleChoices[vehiclePicker.selectedItemPosition])
+            val selectedLane=lanePicker.selectedItemPosition.takeIf { it>0 }
+            val departureMs=System.currentTimeMillis()
             background.execute {
                 val result=runCatching {
-                    val context=RouteAccessContext.atVietnamTime(
-                        RoutingVehicle.TAXI,System.currentTimeMillis())
-                    val route=g.route(origin,destination,context)
+                    val route=g.routeTimed(origin,destination,selectedVehicle,
+                        departureMs,selectedLane)
                     if (route != null) RoutePreviewInstructions.generate(g,route)
                     route
                 }
@@ -376,13 +408,23 @@ class RoutePreviewActivity : Activity() {
                     detailButton.isEnabled=p!=null
                     simulate.isEnabled=p!=null && p.edgeIds.isNotEmpty() &&
                         liveGpsListener==null
-                    navigateButton.isEnabled=p!=null && p.edgeIds.isNotEmpty()
+                    navigateButton.isEnabled=p!=null && p.edgeIds.isNotEmpty() &&
+                        p.accessContext?.vehicle==RoutingVehicle.TAXI &&
+                        !g.hasLaneScopedRules(p)
                     routeStatus.text=when {
                         result.isFailure -> "Tuyến không hợp lệ: ${result.exceptionOrNull()?.message}"
                         p==null -> "Không có tuyến trên đồ thị đã nhập. Không kết luận đường thật bị chặn."
-                        else -> "Xem trước: ${p.edgeIds.size} cạnh khảo sát, " +
-                            String.format(Locale.ROOT,"%.2f km",p.metres/1000.0) +
-                            ". ${fromResult.detail} ${toResult.detail} Không phải hướng dẫn lái."
+                        else -> {
+                            val eta=p.schedule.lastOrNull()?.let { item ->
+                                val seconds=((item.exitEpochMs-departureMs)/1000)
+                                    .coerceAtLeast(0)
+                                " · ETA mô hình ≈ ${(seconds+59)/60} phút"
+                            } ?: ""
+                            "Xem trước: ${p.edgeIds.size} cạnh, " +
+                                String.format(Locale.ROOT,"%.2f km",p.metres/1000.0) +
+                                "$eta. Mở 'Xem các điểm đổi hướng' để xem giờ vào " +
+                                "từng đoạn. KHÔNG phải chỉ dẫn giao thông."
+                        }
                     }
                     showRoute(p)
                 }
