@@ -58,13 +58,18 @@ data class SurveyAccessRule(
     val allowedVehicles: Set<RoutingVehicle> = emptySet(),
     val closures: List<SurveyClosure> = emptyList(),
     val sourceRef: String? = null,
-    val allowedLanes: Set<Int> = emptySet()
+    val allowedLanes: Set<Int> = emptySet(),
+    val blockedVehicles: Set<RoutingVehicle> = emptySet()
 ) {
     val laneScoped: Boolean get() = allowedLanes.isNotEmpty()
-    val conditional: Boolean get() = allowedVehicles.isNotEmpty() || closures.isNotEmpty() || laneScoped
+    val conditional: Boolean get() = allowedVehicles.isNotEmpty() || blockedVehicles.isNotEmpty() ||
+        closures.isNotEmpty() || laneScoped
     init {
         require(closures.size<=32)
         require(allowedLanes.size<=12 && allowedLanes.all { it in 1..12 })
+        require(allowedVehicles.intersect(blockedVehicles).isEmpty()) {
+            "Conflicting allowed/blocked vehicle rule"
+        }
         require(!conditional || !sourceRef.isNullOrBlank()) {
             "Conditional survey rule requires sourceRef"
         }
@@ -74,6 +79,7 @@ data class SurveyAccessRule(
         if(!conditional) return true
         if(context==null) return false
         if(allowedVehicles.isNotEmpty() && context.vehicle !in allowedVehicles) return false
+        if(context.vehicle in blockedVehicles) return false
         if(laneScoped && (context.lane==null || context.lane !in allowedLanes)) return false
         return closures.none { it.blocks(context) }
     }
