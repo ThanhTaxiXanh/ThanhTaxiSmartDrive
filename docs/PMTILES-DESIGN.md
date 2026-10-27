@@ -134,3 +134,22 @@ bị từ chối. Dữ liệu AVIF/MLT chưa hỗ trợ preview. Chưa thử th�
 Tham khảo:
 - https://github.com/protomaps/PMTiles/blob/main/spec/v3/spec.md
 - https://maplibre.org/maplibre-native/android/examples/data/PMTiles/
+
+## Chất lượng tile archive và zoom (bản mới)
+
+- Với PMTiles vector, nguồn MapLibre khai báo minzoom/maxzoom từ chính header
+  (tối đa 22 theo MapLibre Style Spec). Nếu người dùng zoom lớn hơn maxzoom,
+  MapLibre được phép overzoom từ tile mức cao nhất thay vì truy vấn mức cao
+  không tồn tại.
+- Với root directory dùng `none` hoặc `gzip`, importer giải mã có giới
+  hạn, kiểm tra các trường varint, số entries và offset/length tới vùng tile
+  hoặc leaf directory. Archive có root lỗi sẽ bị từ chối sớm.
+- Với Brotli/Zstd nội bộ, bản kiểm tra root bằng Kotlin này chưa giải mã nên
+  hiển thị trạng thái **chưa kiểm chứng root**; MapLibre Native vẫn có thể
+  đọc archive. Không đồng nghĩa xác minh tất cả các tile/leaf.
+- Màn hình nhập hiện lỗi MapLibre (style/tile failed). Sau khi nhập nên
+  pan/zoom, bật Airplane Mode và kiểm tra thực tế xem các đường có vẽ đúng
+  hay không.
+
+Dữ liệu OSM đường phố không tự xác nhận giới hạn tốc độ, biển cấm, một chiều
+hoặc tính hợp lệ của tuyến.

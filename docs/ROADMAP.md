@@ -41,3 +41,7 @@ The application is not a substitute for visual observation of signs and road con
 
 - [x] Bounded MVT vector metadata extraction and MapLibre source-layer selection, offline line style preview
 - [ ] Offline validated HDX Roads OSM archive in field; signed provenance and navigation semantics
+
+- [x] Follow/recenter camera control and PMTiles vector declared source zoom
+- [x] Root directory range/varint checks for PMTiles with none/GZIP compression
+- [ ] Real device archive validation, complete glyphs/labels and map source schema QA

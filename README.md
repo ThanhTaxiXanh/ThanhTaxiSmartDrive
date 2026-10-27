@@ -64,3 +64,20 @@ và vẽ các đường dưới dạng lớp Line trên nền sáng, không cầ
 Dùng nút **Xem thử đường vector đã nhập** trước khi đặt làm nguồn
 Dashboard. Chức năng này chỉ là hiển thị đường, chưa phải điều hướng.
 Nguồn dữ liệu và giấy phép phải do người sử dụng kiểm tra.
+
+## Cập nhật tiếp theo: Free Drive và chất lượng PMTiles
+
+- MapLibre **Theo xe / Tới xe**: thao tác kéo bản đồ bằng tay tạm ngừng
+  bám camera vào GPS; bấm Tới xe để bật lại. Dấu vị trí GPS vẫn được cập nhật.
+- PMTiles vector tuân thủ đúng `minzoom`/`maxzoom` của archive khi thiết lập
+  vector tile source; MapLibre có thể overzoom sau maxzoom thay vì truy
+  vấn các tile không tồn tại.
+- Bộ nhập kiểm tra PMTiles v3 **root directory** khi dùng nội bộ không nén
+  hoặc GZIP: số mục, phạm vi offset/length tới dữ liệu tile/leaf và varint.
+  Nếu chỉ mục nén Brotli/Zstd, hiển thị chưa kiểm tra được, không tự nhận đã
+  xác nhận. Kiểm tra root không thay thế kiểm thử tile thực tế.
+- Nếu MapLibre phát lỗi load tile/style trong màn hình PMTiles, lỗi sẽ hiển
+  thị ngay tại phần trạng thái thay vì chỉ có nền màu trống.
+
+Bản đồ mẫu chỉ để kiểm thử; ứng dụng vẫn chưa phải Android Auto chính thức
+hoặc hệ thống chỉ dẫn/giới hạn tốc độ đã xác nhận.
