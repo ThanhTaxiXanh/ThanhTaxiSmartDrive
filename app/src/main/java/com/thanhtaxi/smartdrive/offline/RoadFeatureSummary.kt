@@ -6,6 +6,15 @@ package com.thanhtaxi.smartdrive.offline
  */
 object RoadFeatureSummary {
     private val priority = listOf("name:vi","name","official_name","ref","int_ref","name_en")
+    fun shortName(properties: Map<String,String?>): String? {
+        // A road label must come from a named feature, not speed or legal tags.
+        for(key in priority) {
+            val value=properties[key]?.replace(Regex("[\\p{Cntrl}]")," ")?.trim()
+            if(!value.isNullOrEmpty()) return value.take(70)
+        }
+        return null
+    }
+
     fun bestDisplay(properties: Map<String,String?>): String {
         for(key in priority) {
             val v = properties[key]?.replace(Regex("[\\p{Cntrl}]")," ")?.trim()
