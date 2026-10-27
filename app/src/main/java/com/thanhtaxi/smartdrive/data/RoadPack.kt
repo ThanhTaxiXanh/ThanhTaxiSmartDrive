@@ -12,6 +12,7 @@ data class Segment(
 )
 data class RoadPack(
     val title: String, val source: String, val license: String,
+    val series: String, val version: Long,
     val segments: List<Segment>, val signs: List<SpeedEvidence>,
     val trafficSigns: List<LocatedRoadSign> = emptyList()
 )
@@ -22,17 +23,68 @@ data class RoadPack(
  */
 class RoadPackRepository(private val context: Context) {
     private val file get() = File(context.filesDir, "road_pack_v1.json")
-    fun load(): RoadPack? = runCatching { if (file.exists()) parse(file.readText()) else null }.getOrNull()
-    fun import(json: String): RoadPack {
+    private val previous get() = File(context.filesDir, "road_pack_previous.json")
+    private val meta get() = context.getSharedPreferences("road_pack_meta", Context.MODE_PRIVATE)
+    fun load(): RoadPack? = runCatching {
+        if (!file.exists()) return null
+        val data = file.readBytes()
+        val recorded = meta.getString("sha256",null)
+        if (recorded != null && !PackIntegrity.consistent(data,recorded)) return null
+        val pack = parse(String(data,Charsets.UTF_8))
+        // Migrate legacy stored files to integrity tracking (not source authentication).
+        if (recorded == null) meta.edit().putString("sha256",PackIntegrity.sha256(data))
+            .putString("series",pack.series).putLong("version",pack.version).apply()
+        pack
+    }.getOrNull()
+    @Synchronized fun import(json: String): RoadPack {
+        require(json.toByteArray(Charsets.UTF_8).size <= 10_000_000)
         val pack = parse(json)
-        val temp = File(context.filesDir, "road_pack_v1.tmp")
-        temp.writeText(json)
-        check(temp.renameTo(file)) { "Không thể thay thế gói dữ liệu cũ" }
-        return pack
+        val oldSeries = meta.getString("series",null)
+        val oldVersion = meta.getLong("version",0L)
+        require(PackVersions.upgradeAllowed(oldSeries,oldVersion,pack.series,pack.version)) {
+            "Phiên bản phải lớn hơn phiên bản đã nhập trong cùng bộ dữ liệu"
+        }
+        val data = json.toByteArray(Charsets.UTF_8)
+        val temp = File(context.filesDir,"road_pack_new.tmp")
+        try {
+            temp.writeBytes(data)
+            check(PackIntegrity.consistent(temp.readBytes(),PackIntegrity.sha256(data))) { "Sai checksum" }
+            if (file.exists()) {
+                val current = file.readBytes()
+                val known = meta.getString("sha256",null)
+                if (known == null || PackIntegrity.consistent(current,known)) {
+                    previous.writeBytes(current)
+                    meta.edit().putString("backupSha256",PackIntegrity.sha256(current)).apply()
+                }
+            }
+            check(temp.renameTo(file)) { "Không thể cập nhật dữ liệu mới" }
+            meta.edit().putString("sha256",PackIntegrity.sha256(data))
+                .putString("series",pack.series).putLong("version",pack.version).apply()
+            return pack
+        } finally { temp.delete() }
+    }
+    @Synchronized fun restoreBackup(): RoadPack {
+        require(previous.exists()) { "Chưa có bản sao lưu" }
+        val bytes = previous.readBytes()
+        require(PackIntegrity.consistent(bytes,meta.getString("backupSha256",null))) {
+            "Checksum bản sao lưu không hợp lệ"
+        }
+        val restored = parse(String(bytes,Charsets.UTF_8))
+        val temp = File(context.filesDir,"road_pack_restore.tmp")
+        try {
+            temp.writeBytes(bytes)
+            check(temp.renameTo(file)) { "Không thể khôi phục" }
+            meta.edit().putString("sha256",PackIntegrity.sha256(bytes))
+                .putString("series",restored.series).putLong("version",restored.version).apply()
+            return restored
+        } finally { temp.delete() }
     }
     fun parse(json: String): RoadPack {
         val root = JSONObject(json)
         require(root.getInt("schema") == 1) { "Phiên bản gói không hỗ trợ" }
+        val series = root.optString("series","legacy-v1").trim()
+        val version = root.optLong("version",1L)
+        require(series.isNotBlank() && version in 1..1_000_000_000)
         val title = root.getString("title").trim()
         val source = root.getString("source").trim()
         val license = root.getString("license").trim()
@@ -111,6 +163,6 @@ class RoadPackRepository(private val context: Context) {
             )
         }
         require(located.distinctBy { it.id }.size == located.size) { "Trùng mã ID biển báo" }
-        return RoadPack(title, source, license, segments, signs, located)
+        return RoadPack(title, source, license, series, version, segments, signs, located)
     }
 }
