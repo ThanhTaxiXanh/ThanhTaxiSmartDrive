@@ -2,6 +2,11 @@ package com.thanhtaxi.smartdrive.offline
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Context
+import android.net.ConnectivityManager
+import android.provider.Settings
+import org.json.JSONObject
+import java.io.File
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -22,6 +27,7 @@ import org.maplibre.android.maps.Style
  */
 class PmtilesManagerActivity : Activity() {
     private val requestFile = 501
+    private val requestExport = 502
     private lateinit var store: PmtilesArchiveStore
     private lateinit var message: TextView
     private lateinit var sourceInput: EditText
@@ -32,6 +38,11 @@ class PmtilesManagerActivity : Activity() {
     private lateinit var choose: Button
     private lateinit var preview: Button
     private lateinit var mapView: MapView
+    private lateinit var visibleTiles: CheckBox
+    private lateinit var multipleZooms: CheckBox
+    private lateinit var restarted: CheckBox
+    private lateinit var exportReport: Button
+    private var styleReady = false
     private var loaded: PmtilesArchive? = null
     private val executor = Executors.newSingleThreadExecutor()
 
@@ -84,6 +95,35 @@ class PmtilesManagerActivity : Activity() {
             setOnClickListener { showRaster() }
         }
         controls.addView(preview)
+        text("Phiếu thử offline (người dùng tự quan sát; không phải chứng nhận tự động)")
+        visibleTiles=CheckBox(this).apply {
+            text="Tôi đã nhìn thấy tile đúng vị trí khi không có mạng"
+            controls.addView(this)
+        }
+        multipleZooms=CheckBox(this).apply {
+            text="Tôi đã pan và thử ít nhất hai mức zoom"
+            controls.addView(this)
+        }
+        restarted=CheckBox(this).apply {
+            text="Tôi đã đóng rồi mở lại ứng dụng và thử lại khi offline"
+            controls.addView(this)
+        }
+        controls.addView(Button(this).apply {
+            text="Ghi báo cáo thử offline vào bộ nhớ riêng"
+            setOnClickListener { recordManualAudit() }
+        })
+        exportReport=Button(this).apply {
+            text="Xuất báo cáo kiểm thử JSON"
+            isEnabled=reportFile().isFile
+            setOnClickListener {
+                startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type="application/json"
+                    putExtra(Intent.EXTRA_TITLE,"pmtiles_offline_trial.json")
+                },requestExport)
+            }
+        }
+        controls.addView(exportReport)
         controls.addView(Button(this).apply {
             text="Xóa gói PMTiles đang chọn khỏi bộ nhớ riêng"
             setOnClickListener {
@@ -129,6 +169,7 @@ class PmtilesManagerActivity : Activity() {
             runOnUiThread {
                 if(isFinishing||isDestroyed) return@runOnUiThread
                 loaded=archive
+                styleReady=false
                 preview.isEnabled=archive?.header?.isRaster==true
                 message.text=if(archive==null) "Chưa có archive hợp lệ, hoặc checksum không khớp."
                     else "SHA-256: " + archive.sha256.take(16) + "… · " +
@@ -140,7 +181,19 @@ class PmtilesManagerActivity : Activity() {
     }
     override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?) {
         super.onActivityResult(requestCode,resultCode,data)
-        if(requestCode!=requestFile||resultCode!=RESULT_OK) return
+        if(resultCode!=RESULT_OK) return
+        if(requestCode==requestExport) {
+            val uri=data?.data ?:return
+            try {
+                val bytes=reportFile().readBytes()
+                checkNotNull(contentResolver.openOutputStream(uri)) { "Cannot create export" }.use {
+                    it.write(bytes)
+                }
+                message.text="Đã xuất báo cáo tự khai; chưa phải kết quả xác minh độc lập."
+            } catch(e:Exception) { message.text="Xuất báo cáo thất bại: "+e.message }
+            return
+        }
+        if(requestCode!=requestFile) return
         val uri:Uri=data?.data ?:return
         choose.isEnabled=false;preview.isEnabled=false
         message.text="Đang sao chép và kiểm tra SHA-256; không đóng màn hình."
@@ -155,6 +208,7 @@ class PmtilesManagerActivity : Activity() {
                 choose.isEnabled=true
                 result.onSuccess { archive ->
                     loaded=archive
+                    styleReady=false
                     preview.isEnabled=archive.header.isRaster
                     message.text="Đã sao chép và xác minh cấu trúc: "+archive.header.formatName+
                         " · "+archive.file.length()/1024/1024+" MiB. SHA-256: "+archive.sha256+
@@ -172,7 +226,9 @@ class PmtilesManagerActivity : Activity() {
             message.text="Bản đồ chưa sẵn sàng";return
         }
         try {
+            styleReady=false
             m.setStyle(Style.Builder().fromJson(PmtilesRasterStyle.make(a))) {
+                styleReady=true
                 m.cameraPosition=CameraPosition.Builder()
                     .target(LatLng(a.header.centerLat,a.header.centerLon))
                     .zoom(a.header.centerZoom.toDouble().coerceIn(
@@ -181,6 +237,43 @@ class PmtilesManagerActivity : Activity() {
                 message.text="Đã tải cấu hình style PMTiles cục bộ. Phải kiểm tra tile thực trên thiết bị ở chế độ máy bay."
             }
         } catch(e:Exception) { message.text="Không mở được style: "+e.message }
+    }
+    private fun reportFile(): File = File(filesDir,"pmtiles_offline_trial.json")
+    private fun recordManualAudit() {
+        val archive=loaded
+        val connected=(getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
+            .activeNetwork != null
+        val observations=OfflineSmokeObservations(
+            archiveChecksumKnown=archive!=null,
+            mapStyleLoaded=styleReady,
+            noActiveNetwork=!connected,
+            userObservedMapTiles=visibleTiles.isChecked,
+            userTriedMultipleZoomLevels=multipleZooms.isChecked,
+            userRestartedApplication=restarted.isChecked
+        )
+        val status=OfflineSmokePolicy.assess(observations)
+        if(status!=OfflineSmokeStatus.READY_FOR_HUMAN_REVIEW) {
+            message.text="Chưa đủ điều kiện ghi phiếu: cần mở style, không có mạng hoạt động " +
+                "và tự xác nhận ba bước nhìn bằng mắt, zoom và khởi động lại."
+            return
+        }
+        val report=JSONObject()
+            .put("archiveSha256",archive!!.sha256)
+            .put("archiveBytes",archive.file.length())
+            .put("timestampUtcMs",System.currentTimeMillis())
+            .put("noActiveNetworkObserved",true)
+            .put("styleLoadCallbackObserved",styleReady)
+            .put("userReportedTilesVisible",visibleTiles.isChecked)
+            .put("userReportedZoomTest",multipleZooms.isChecked)
+            .put("userReportedRestartTest",restarted.isChecked)
+            .put("result",status.name)
+            .put("independentVerification",false)
+            .put("disclaimer","USER SELF-REPORT ONLY: no tile-level automated attestation")
+        try {
+            reportFile().writeText(report.toString(2),Charsets.UTF_8)
+            exportReport.isEnabled=true
+            message.text="Đã lưu phiếu thử do người dùng tự khai; không chứng nhận ảnh bản đồ chính xác."
+        } catch(e:Exception) { message.text="Không ghi được báo cáo: "+e.message }
     }
     override fun onStart(){super.onStart();if(::mapView.isInitialized)mapView.onStart()}
     override fun onResume(){super.onResume();if(::mapView.isInitialized)mapView.onResume()}
