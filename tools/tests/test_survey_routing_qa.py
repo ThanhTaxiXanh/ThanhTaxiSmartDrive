@@ -81,7 +81,7 @@ class SurveyRoutingQaTests(unittest.TestCase):
         g["destinations"][0]["nodeId"]="NO_NODE"
         self.assertTrue(errors(g,r))
         g["destinations"][0]["nodeId"]="B"
-        g["destinations"][0]["aliases"]=["control\\ninvalid"]
+        g["destinations"][0]["aliases"]=["control"+chr(10)+"invalid"]
         self.assertTrue(errors(g,r))
 
     def test_display_name_needs_clean_user_supplied_metadata(self):
