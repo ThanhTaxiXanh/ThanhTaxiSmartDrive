@@ -1,0 +1,55 @@
+name: Android Emulator Phase 2
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app/src/main/**'
+      - 'app/src/androidTest/**'
+      - 'app/build.gradle.kts'
+      - '.github/workflows/android-emulator.yml'
+  pull_request:
+    paths:
+      - 'app/src/main/**'
+      - 'app/src/androidTest/**'
+      - 'app/build.gradle.kts'
+      - '.github/workflows/android-emulator.yml'
+permissions:
+  contents: read
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Enable KVM acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Android virtual device UI and navigation tests (API 35)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: gradle --no-daemon :app:connectedDebugAndroidTest
+      - name: Upload emulator instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ThanhTaxiSmartDrive-emulator-tests
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+          if-no-files-found: ignore
