@@ -107,15 +107,38 @@ class RoutePreviewActivity : Activity() {
             return
         }
         val search=OfflineDestinationIndex(g)
-        val ids=search.allLabels()
-        fun choose(label:String): AutoCompleteTextView =
-            AutoCompleteTextView(this).apply {
+        fun choose(label:String): AutoCompleteTextView {
+            val adapter=object:ArrayAdapter<String>(
+                this,android.R.layout.simple_dropdown_item_1line,
+                mutableListOf<String>()) {
+                fun showResults(found:List<String>) {
+                    clear()
+                    addAll(found)
+                    notifyDataSetChanged()
+                }
+                private val offlineFilter=object:android.widget.Filter() {
+                    override fun performFiltering(query:CharSequence?):FilterResults {
+                        val matches=search.suggestions(query?.toString().orEmpty(),12)
+                        return FilterResults().apply {
+                            values=matches
+                            count=matches.size
+                        }
+                    }
+                    override fun publishResults(query:CharSequence?,results:FilterResults?) {
+                        @Suppress("UNCHECKED_CAST")
+                        val found=results?.values as? List<String> ?: emptyList()
+                        showResults(found)
+                    }
+                }
+                override fun getFilter():android.widget.Filter=offlineFilter
+            }
+            return AutoCompleteTextView(this).apply {
                 hint=label
                 threshold=1
                 setSingleLine(true)
-                setAdapter(ArrayAdapter(this@RoutePreviewActivity,
-                    android.R.layout.simple_dropdown_item_1line,ids))
+                setAdapter(adapter)
             }
+        }
         val start=choose("ID/tên điểm khảo sát hoặc tọa độ xuất phát")
         startInput=start
         val finish=choose("ID/tên điểm khảo sát hoặc tọa độ đến")
