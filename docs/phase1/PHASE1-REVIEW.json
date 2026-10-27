@@ -1,0 +1,56 @@
+{
+  "review_date": "2026-10-27",
+  "source": "Thanh Taxi Smart Drive MASTER PROMPT section XX Phase 1 and XXI",
+  "phase": 1,
+  "gate": "architecture_documentation_complete_pending_CI",
+  "scope": "Technical feasibility and architecture only; no road legal or Android Auto runtime certification",
+  "reviewed_inputs": [
+    "Prompt Thanh Taxi Smart Drive.txt",
+    "car-taxi-driver-skill.zip/SKILL.md",
+    "references/architecture.md",
+    "references/speed_limits_2026.md",
+    "SKILL Dart sources and test workflows",
+    "Fermata upstream GitHub",
+    "MapLibre Navigation Android upstream releases",
+    "Android for Cars official documentation"
+  ],
+  "architecture_decisions": [
+    "Separate standalone Android head-unit four-pane Activity from Android Auto templated CarAppService",
+    "Kotlin-first existing app with pure domain and data contracts",
+    "MapLibre Native with licensed PMTiles and independent offline routing graph",
+    "Fail-closed speed evidence and map matching",
+    "Public-key authenticated sign pack future requirement"
+  ],
+  "docs": [
+    "docs/phase1/README.md",
+    "docs/phase1/PRD.md",
+    "docs/phase1/FEASIBILITY.md",
+    "docs/phase1/ARCHITECTURE.md",
+    "docs/phase1/DATA-MODEL.md",
+    "docs/phase1/WIREFRAMES.md",
+    "docs/phase1/SDK-AND-LICENSES.md",
+    "docs/phase1/ADRS.md",
+    "docs/phase1/RISK-AND-TEST-GATES.md",
+    "docs/phase1/REQUIREMENTS.csv"
+  ],
+  "unverified_hardware": [
+    "VinFast VF e34 support for installing a custom Android Activity",
+    "Android Auto Desktop Head Unit template app in current binary",
+    "PMTiles device verified offline rendering"
+  ],
+  "later_phase_blockers": [
+    "Signed and legally verified Vietnamese road/sign data",
+    "Production turn-by-turn navigation and eligible Android Auto category",
+    "Layout Editor and multiple dashboard themes",
+    "On-device Camera AI and full offline quality tests",
+    "Provider tile-download quota enforcement",
+    "Commercial license and build SBOM/release signing"
+  ],
+  "current_app_claims": {
+    "kotlin_maplibre_debug_build": true,
+    "android_auto_carappservice": false,
+    "custom_four_panel_headunit_preview": true,
+    "legal_speed_certification": false,
+    "completed_national_sign_data": false
+  }
+}

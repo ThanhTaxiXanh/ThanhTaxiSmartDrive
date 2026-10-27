@@ -1,0 +1,45 @@
+id,source_section,requirement,phase,platform,current_status,evidence,next_gate
+MAP-01,V.2,MapLibre GPS vehicle position,2,PHONE+HEADUNIT,partial,MainActivity,real device GPS and map quality
+MAP-02,V.2,Free Drive with camera follow,2,PHONE+HEADUNIT,partial,FreeDriveCameraState,real device while parked/road test
+MAP-03,V.2,2D/3D day night speed zoom,2,PHONE+HEADUNIT,not_started,docs/ROADMAP.md,UI and device trials
+MAP-04,V.2,Search Vietnam locations address Vietnamese,2,PHONE+HEADUNIT,not_started,docs/ROADMAP.md,licensed geocoder
+MAP-05,V.2,Route alternatives ETA voice recalc,2,PHONE+HEADUNIT,partial,navigation/OfflineRouteGraph.kt,road routing engine and device QA
+MAP-06,V.3,Directional multilevel road matching,2,PHONE+HEADUNIT,partial,domain/StableRoadMatcher.kt,parallel bridge road field trials
+SPD-01,VII.1,GPS speed plus legal speed PIP,2,PHONE+HEADUNIT,partial,MainActivity,visible PIP/size QA
+SPD-02,VII.2,Segment scoped speed applicability,2,PHONE+HEADUNIT,partial,domain/SpeedLimitEngine.kt,lane time vehicle proof
+SPD-03,VII.1,Warning tiers configurable and audible,2,PHONE+HEADUNIT,partial,domain/SpeedCompliance.kt,device audio and visual testing
+SPD-04,VII.3,Conflict unknown and source priority,2,PHONE+HEADUNIT,partial,domain/SpeedLimitEngine.kt,legal evidence and conflict scenarios
+SPD-05,VII.2,R420 R421 P127 and termination,2,PHONE+HEADUNIT,partial,domain/TrafficSignEngine.kt,verified applicability data
+SPD-06,VII.4,Verified road segment metadata,4,PHONE+HEADUNIT,partial,data/RoadPack.kt,publisher authentication
+SIG-01,VI.1,Traffic sign code catalog,2,PHONE+HEADUNIT,partial,domain/TrafficSignEngine.kt,full classified sign tests
+SIG-02,VI.2,Geolocated directions and applicability,2,PHONE+HEADUNIT,partial,data/RoadPack.kt,field source/vehicle/lane tests
+SIG-03,VI.2,Upcoming sign alerts and clustering,2,PHONE+HEADUNIT,partial,MainActivity,render and alert trials
+SIG-04,XIII.3,User missing incorrect sign reports,4,PHONE,not_started,docs/SURVEY-QA.md,moderation pipeline
+AI-01,VIII,Camera recognition R420 R421 P127,4,PHONE+HEADUNIT,not_started,docs/ROADMAP.md,consented AI pipeline
+AI-02,VIII,On device inference and temporal dedup,4,PHONE+HEADUNIT,not_started,docs/ROADMAP.md,benchmarks and false positive QA
+DASH-01,IV,Four panel 70/30 head unit,3,HEADUNIT,partial,MainActivity,real screen aspect test
+DASH-02,IV.2,16:9 16:10 21:9 responsiveness,3,HEADUNIT,partial,docs/phase1/WIREFRAMES.md,screen and typography tests
+DASH-03,IV.1,Drag drop and named layout presets,3,PHONE,not_started,docs/phase1/WIREFRAMES.md,editor plus persistence
+DASH-04,XV,Four themes legibility and safe tap,3,PHONE+HEADUNIT,not_started,docs/phase1/WIREFRAMES.md,sunglare night UI QA
+CAL-01,IX.1,Offline Vietnam lunar and solar dates,3,PHONE+HEADUNIT,partial,calendar/LunarCalendar.kt,leap dates and holiday audits
+CAL-02,IX.2,User events repeat reminder calendar,3,PHONE,not_started,docs/phase1/DATA-MODEL.md,event CRUD and notifications
+QR-01,X,Local image QR selection and display,3,PHONE+HEADUNIT,partial,SettingsActivity,profile list and parked QA
+QR-02,X.3,Payment mode does not assume paid,3,HEADUNIT,not_started,docs/phase1/PRD.md,UI and safety tests
+MEDIA-01,XI.2,Permission scoped Android MediaSession,3,PHONE+HEADUNIT,partial,media/MediaAccessService.kt,multi-player actual session QA
+MEDIA-02,XI.3,Compact expanded and hidden media modes,3,HEADUNIT,not_started,docs/phase1/WIREFRAMES.md,mode/theme test
+OFF-01,V.1,Offline PMTiles/MBTiles import and render,4,PHONE+HEADUNIT,partial,offline/PmtilesArchiveStore.kt,device offline render proof
+OFF-02,XIII.2,Data import QA version rollback integrity,4,PHONE,partial,data/RoadPack.kt,signed publisher/revocation
+OFF-03,XIII.1,Legally sourced nationwide sign data,4,PHONE+HEADUNIT,not_started,docs/SURVEY-PIPELINE.md,licensed verified survey data
+OFF-04,XIV.4,Offline region update independent of APK,4,PHONE,partial,offline/OfflineMapsActivity.kt,tile quota QA
+AUTO-01,III.B,Official Android Auto CarAppService templates,5,ANDROID_AUTO,not_started,docs/ANDROID-AUTO.md,category and DHU
+AUTO-02,XI.2,Compliant AA media integration,5,ANDROID_AUTO,not_started,docs/ANDROID-AUTO.md,eligible session API and review
+AUTO-03,XXIII,Separate AA and custom dashboard acceptance,5,ANDROID_AUTO+HEADUNIT,designed,docs/phase1/FEASIBILITY.md,two real-device test sets
+OPS-01,XVI,Modular domain and clean contracts,1,ALL,designed,docs/phase1/ARCHITECTURE.md,review plus guard
+OPS-02,XIX,CI tests and debug APK artifact,1,ALL,implemented,github/.github/workflows/android.yml,successful GitHub Actions
+OPS-03,XVII,Memory thermal FPS and battery,6,PHONE+HEADUNIT,not_started,docs/phase1/RISK-AND-TEST-GATES.md,measured device profiles
+OPS-04,XVIII,Integration UI car DHU and road tests,6,ALL,not_started,docs/phase1/RISK-AND-TEST-GATES.md,test evidence
+OPS-05,XIX,Signed release from GitHub Secrets,6,ALL,not_started,docs/phase1/SDK-AND-LICENSES.md,release signing process
+OPS-06,XIII,Source attribution licensing privacy,1,ALL,designed,docs/phase1/SDK-AND-LICENSES.md,license inventory with blockers
+OPS-07,III,Phone sync dashboard state,3,PHONE+HEADUNIT,not_started,docs/phase1/ARCHITECTURE.md,sync protocol and tests
+OPS-08,I,User safety and no overconfident speed,1,ALL,designed,docs/phase1/ADRS.md,design review
+OPS-09,XX,Phase gated evidence not feature claims,1,ALL,designed,docs/phase1/RISK-AND-TEST-GATES.md,Phase 1 guard
