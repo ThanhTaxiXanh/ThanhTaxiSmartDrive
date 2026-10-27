@@ -5,7 +5,7 @@ enum class PopulationZone { INSIDE, OUTSIDE, UNKNOWN }
 enum class RoadKind { DIVIDED_OR_MULTI_LANE_ONEWAY, TWO_WAY_OR_SINGLE_LANE_ONEWAY, MOTORWAY, UNKNOWN }
 enum class VehicleClass { TAXI, LARGE_BUS, BUS_OR_MOTORCYCLE, TOWING_OR_TANKER, SPECIAL_MACHINERY }
 enum class EvidenceSource { VERIFIED_SIGN, VALIDATED_CAMERA, VERIFIED_MAP, UNVERIFIED_MAP }
-enum class LimitStatus { VERIFIED, ESTIMATED_FROM_LAW, UNKNOWN, CONFLICT }
+enum class LimitStatus { VERIFIED, SURVEY_REPORTED, ESTIMATED_FROM_LAW, UNKNOWN, CONFLICT }
 data class RoadContext(
     val segmentId: String?,
     val direction: String?,
@@ -28,7 +28,9 @@ data class SpeedEvidence(
     val validUntilEpochMs: Long = Long.MAX_VALUE,
     val confidence: Double = 1.0,
     val reviewed: Boolean = false,
-    val sourceRef: String? = null
+    val sourceRef: String? = null,
+    /** Can only be set by future trusted signed-pack verifier; never by imported JSON. */
+    val publisherAuthenticated: Boolean = false
 )
 data class LimitResult(
     val kph: Int?,
@@ -51,7 +53,8 @@ class SpeedLimitEngine {
             (it.vehicle == null || it.vehicle == context.vehicle) &&
             nowEpochMs in it.validFromEpochMs..it.validUntilEpochMs &&
             it.confidence >= (if (it.source == EvidenceSource.VALIDATED_CAMERA) 0.93 else 0.8) &&
-            it.reviewed && it.source != EvidenceSource.UNVERIFIED_MAP
+            it.reviewed && !it.sourceRef.isNullOrBlank() &&
+            it.source != EvidenceSource.UNVERIFIED_MAP
         }
         for (source in listOf(EvidenceSource.VERIFIED_SIGN, EvidenceSource.VALIDATED_CAMERA, EvidenceSource.VERIFIED_MAP)) {
             val items = applicable.filter { it.source == source && (source != EvidenceSource.VERIFIED_SIGN || it.reviewed) }
@@ -61,7 +64,15 @@ class SpeedLimitEngine {
                 val disagreement = applicable.any { it.kph != limits[0] }
                 if (disagreement) return LimitResult(null, LimitStatus.CONFLICT,
                     "conflicting sources", "Các nguồn dữ liệu tốc độ chưa thống nhất")
-                return LimitResult(limits[0], LimitStatus.VERIFIED, source.name, "Dữ liệu áp dụng cho đúng đoạn đường")
+                // Imported reviewed=true and a sourceRef are user-controlled. They
+                // do NOT imply authenticated publisher or legal certification.
+                val authenticated = items.all { it.publisherAuthenticated } &&
+                    applicable.all { it.publisherAuthenticated }
+                return LimitResult(limits[0],
+                    if (authenticated) LimitStatus.VERIFIED else LimitStatus.SURVEY_REPORTED,
+                    source.name,
+                    if(authenticated) "Nguồn được xác thực; vẫn phải quan sát biển thực tế"
+                    else "Tham khảo gói khảo sát người dùng; CHƯA xác thực pháp lý")
             }
         }
         if (context.kind == RoadKind.MOTORWAY) return unknown("Cao tốc cần giới hạn theo biển và tổ chức giao thông")

@@ -8,6 +8,7 @@ class SpeedLimitEngineTest {
     private fun road(zone: PopulationZone = PopulationZone.INSIDE, kind: RoadKind = RoadKind.DIVIDED_OR_MULTI_LANE_ONEWAY) =
         RoadContext("seg-10", "north", 1, zone, kind, matchedConfidently = true, gpsReliable = true)
     @Test fun insidePopulationDefaultsFromVerifiedRoadClassification() {
+        assertEquals(LimitStatus.ESTIMATED_FROM_LAW,engine.resolve(road(),emptyList(),1000).status)
         assertEquals(60, engine.resolve(road(), emptyList(), 1000).kph)
         assertEquals(50, engine.resolve(road(kind = RoadKind.TWO_WAY_OR_SINGLE_LANE_ONEWAY), emptyList(), 1000).kph)
     }
@@ -16,13 +17,13 @@ class SpeedLimitEngineTest {
         assertEquals(80, engine.resolve(road(PopulationZone.OUTSIDE, RoadKind.TWO_WAY_OR_SINGLE_LANE_ONEWAY), emptyList(), 1000).kph)
     }
     @Test fun verifiedSignAppliesToSegmentAndDirectionOnly() {
-        val sign = SpeedEvidence(40, "seg-10", EvidenceSource.VERIFIED_SIGN, direction = "north", reviewed = true)
+        val sign = SpeedEvidence(40, "seg-10", EvidenceSource.VERIFIED_SIGN, direction = "north", reviewed = true, sourceRef = "test-survey")
         assertEquals(40, engine.resolve(road(), listOf(sign), 1000).kph)
         assertEquals(60, engine.resolve(road().copy(direction="south"), listOf(sign), 1000).kph)
         assertEquals(60, engine.resolve(road().copy(segmentId="seg-11"), listOf(sign), 1000).kph)
     }
     @Test fun limitWithLaneAndTimeConstraints() {
-        val sign = SpeedEvidence(30, "seg-10", EvidenceSource.VERIFIED_SIGN, lane = 2, validFromEpochMs = 500, validUntilEpochMs = 1500, reviewed = true)
+        val sign = SpeedEvidence(30, "seg-10", EvidenceSource.VERIFIED_SIGN, lane = 2, validFromEpochMs = 500, validUntilEpochMs = 1500, reviewed = true, sourceRef = "test-survey")
         assertEquals(60, engine.resolve(road(), listOf(sign), 1000).kph)
         assertEquals(30, engine.resolve(road().copy(lane = 2), listOf(sign), 1000).kph)
         assertEquals(60, engine.resolve(road().copy(lane = 2), listOf(sign), 2000).kph)
@@ -33,7 +34,7 @@ class SpeedLimitEngineTest {
         assertNull(engine.resolve(road(kind=RoadKind.MOTORWAY), emptyList(), 1000).kph)
     }
     @Test fun conflictingSignsDoNotGuess() {
-        val signs = listOf(40, 50).map { SpeedEvidence(it, "seg-10", EvidenceSource.VERIFIED_SIGN, reviewed = true) }
+        val signs = listOf(40, 50).map { SpeedEvidence(it, "seg-10", EvidenceSource.VERIFIED_SIGN, reviewed = true, sourceRef = "test-survey") }
         assertEquals(LimitStatus.CONFLICT, engine.resolve(road(), signs, 1000).status)
         assertNull(engine.resolve(road(), signs, 1000).kph)
     }
@@ -43,10 +44,27 @@ class SpeedLimitEngineTest {
     }
     @Test fun contradictoryTrustedSourcesAreUnknown() {
         val signs = listOf(
-            SpeedEvidence(40,"seg-10",EvidenceSource.VERIFIED_SIGN,reviewed=true),
-            SpeedEvidence(50,"seg-10",EvidenceSource.VERIFIED_MAP,reviewed=true))
+            SpeedEvidence(40,"seg-10",EvidenceSource.VERIFIED_SIGN,reviewed=true, sourceRef="test-survey"),
+            SpeedEvidence(50,"seg-10",EvidenceSource.VERIFIED_MAP,reviewed=true, sourceRef="test-survey"))
         assertEquals(LimitStatus.CONFLICT, engine.resolve(road(),signs,1000).status)
         assertNull(engine.resolve(road(),signs,1000).kph)
+    }
+    @Test fun surveyReportedLimitNeverClaimsPublisherAuthentication() {
+        val e = SpeedEvidence(40,"seg-10",EvidenceSource.VERIFIED_SIGN,
+            reviewed=true, sourceRef="user-photo:2026")
+        val result=engine.resolve(road(),listOf(e),1000)
+        assertEquals(40,result.kph)
+        assertEquals(LimitStatus.SURVEY_REPORTED,result.status)
+        assertTrue(result.note.contains("CHƯA xác thực"))
+    }
+    @Test fun missingProvenanceDoesNotElevateUserReviewedFlag() {
+        val e=SpeedEvidence(40,"seg-10",EvidenceSource.VERIFIED_SIGN,reviewed=true)
+        assertEquals(LimitStatus.ESTIMATED_FROM_LAW,engine.resolve(road(),listOf(e),1000).status)
+    }
+    @Test fun trustedVerifierWouldBeRequiredForVerifiedState() {
+        val e=SpeedEvidence(40,"seg-10",EvidenceSource.VERIFIED_SIGN,
+            reviewed=true,sourceRef="authorized-signed-pack",publisherAuthenticated=true)
+        assertEquals(LimitStatus.VERIFIED,engine.resolve(road(),listOf(e),1000).status)
     }
     @Test fun unreviewedCameraCannotOverrideVerifiedInformation() {
         val sign = SpeedEvidence(40, "seg-10", EvidenceSource.VALIDATED_CAMERA, confidence = 0.99, reviewed = false)
