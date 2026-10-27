@@ -556,6 +556,8 @@ class MainActivity : Activity(), LocationListener {
         if(!fresh && activeNavigation!=null &&
             navUpdate.phase!=NavigationPhase.GPS_UNCERTAIN &&
             navUpdate.phase!=NavigationPhase.ARRIVED) {
+            offlineVoice?.stop()
+            promptPolicy.reset()
             val engine=activeNavigation
             val epoch=navGeneration
             if(engine!=null) navWorker.execute {
@@ -724,6 +726,7 @@ class MainActivity : Activity(), LocationListener {
         if(graph==null || routeEdges.isEmpty() || routeEdges.size>20_000 ||
             routeNodes.size!=routeEdges.size+1 || !metres.isFinite() ||
             metres<=0.0 || metres>1.0e8) {
+            stopActiveNavigation()
             Toast.makeText(this,"Không có gói tuyến khảo sát hợp lệ.",Toast.LENGTH_LONG).show()
             return
         }
