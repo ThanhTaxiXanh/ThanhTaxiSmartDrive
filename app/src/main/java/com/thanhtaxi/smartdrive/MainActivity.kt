@@ -83,6 +83,8 @@ class MainActivity : Activity(), LocationListener {
     private var tone: ToneGenerator? = null
     private var displayedImageUri: String? = null
     private val matcher = GeoMatcher()
+    private val stableMatcher = StableRoadMatcher()
+    private var stableMatch: RoadMatch? = null
     private val signEngine = TrafficSignEngine()
     private var roadPack: RoadPack? = null
     private var roadLines: List<RoadLine> = emptyList()
@@ -409,6 +411,12 @@ class MainActivity : Activity(), LocationListener {
         if (ageNanos < -1_000_000_000L || ageNanos > 8_000_000_000L) return
         lastLocation = location
         lastFixElapsedMs = location.elapsedRealtimeNanos / 1_000_000L
+        val observedMatch = if(location.hasAccuracy() && location.accuracy <= 20f)
+            matcher.match(GeoFix(location.latitude,location.longitude,location.accuracy.toDouble(),
+                if(location.hasBearing()) location.bearing.toDouble() else null,
+                if(location.hasSpeed()) location.speed.toDouble() else null),roadIndex)
+            else null
+        stableMatch = stableMatcher.observe(observedMatch,lastFixElapsedMs)
         follow(location)
         renderNearbySigns(location)
         refreshData()
@@ -446,12 +454,8 @@ class MainActivity : Activity(), LocationListener {
             (!loc.hasSpeedAccuracy() || loc.speedAccuracyMetersPerSecond <= 2.5f)
         val speed = if (speedReliable && loc != null) loc.speed.toDouble() * 3.6 else null
         val pack = roadPack
-        val match = if (accurate && loc != null && pack != null) matcher.match(
-            GeoFix(loc.latitude, loc.longitude, loc.accuracy.toDouble(),
-                if (loc.hasBearing()) loc.bearing.toDouble() else null,
-                if (loc.hasSpeed()) loc.speed.toDouble() else null),
-            roadIndex
-        ) else null
+        // UI ticks cannot manufacture new fix evidence.
+        val match = if(accurate && pack!=null) stableMatch else null
         val segment = pack?.segments?.firstOrNull { it.id == match?.segmentId }
         val baseContext = RoadContext(segment?.id, segment?.direction, null,
             segment?.zone ?: PopulationZone.UNKNOWN, segment?.kind ?: RoadKind.UNKNOWN,
@@ -484,6 +488,8 @@ class MainActivity : Activity(), LocationListener {
         gpsLabel.text = when {
             !fresh -> "Mất GPS / tín hiệu cũ"
             !accurate -> "GPS yếu: ${loc?.accuracy?.toInt()}m"
+            segment == null && stableMatcher.isConfirming ->
+                "GPS: đang xác nhận đoạn đường qua nhiều mẫu"
             segment == null -> "GPS tốt • Chưa có đoạn đường được xác minh"
             else -> "GPS: ${loc!!.accuracy.toInt()}m • Đoạn: ${segment.id}"
         }
@@ -569,6 +575,8 @@ class MainActivity : Activity(), LocationListener {
             RoadLine(it.id,it.startLat,it.startLon,it.endLat,it.endLon,it.reviewed)
         }
         roadIndex = RoadSpatialIndex(roadLines)
+        stableMatcher.reset()
+        stableMatch=null
         loadSelectedMap()
         lastMarkerLocation = null
         renderNearbySigns(lastLocation)
@@ -577,6 +585,8 @@ class MainActivity : Activity(), LocationListener {
     override fun onStart() { super.onStart(); mapView.onStart() }
     override fun onPause() {
         handler.removeCallbacks(tick); locationManager.removeUpdates(this)
+        stableMatcher.reset()
+        stableMatch=null
         mapView.onPause(); super.onPause()
     }
     override fun onStop() { mapView.onStop(); super.onStop() }
