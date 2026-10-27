@@ -82,6 +82,15 @@ class TimedRoutingTest {
         assertTrue(route.schedule[0].exitEpochMs>time(9,0,0))
     }
 
+    @Test fun delayedGpsProgressRechecksFutureEdgeArrivalAndSuspendsAtBan() {
+        val plan=g.routeTimed("A","C",RoutingVehicle.TAXI,time(6,58))!!
+        assertEquals(listOf("ab","bc"),plan.edgeIds)
+        assertTrue(g.remainingSchedulePermits(plan,0,15.0,time(6,58,5)))
+        // Actual arrival to bc would occur after 07:00; original preview
+        // constructed at 06:58 is no longer safe to assert.
+        assertFalse(g.remainingSchedulePermits(plan,0,15.0,time(6,59,50)))
+    }
+
     @Test fun malformedSpeedOrMissingContextFailsClosed() {
         assertNull(g.routeTimed("A","C",RoutingVehicle.TAXI,-1))
         assertNull(g.routeTimed("A","C",RoutingVehicle.TAXI,time(10,0),
