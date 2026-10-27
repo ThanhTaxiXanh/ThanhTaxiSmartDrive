@@ -16,6 +16,7 @@ Dự án mã nguồn **Thanh Taxi Smart Drive** dành cho tài xế Việt Nam.
 - Vào **Cài đặt** (khi dừng xe) để nhập gói JSON; xem [ROAD-PACK](docs/ROAD-PACK.md).
 - Ảnh QR được người dùng tự chọn và lưu URI cục bộ. Media cần cấp Notification Listener.
 - Ở ngang màn hình: bản đồ ~70%, lịch/QR/Media ~30%; đây là Android Activity dành cho head-unit, **không phải giao diện Android Auto chính thức**.
+- Nhập PMTiles: Cài đặt → Nhập PMTiles (chỉ khi xe đỗ), kiểm tra header/SHA-256. PNG/JPEG/WebP có preview raster trên MapLibre; vector chưa có style/layer hiển thị tự động.
 - Quản lý offline: vào Cài đặt → Quản lý vùng Bắc Giang/Bắc Ninh (khi xe đỗ), dùng Wi-Fi, chỉ với nguồn style/tile cho phép cache. Gói giới hạn quanh khu vực trung tâm (không phủ toàn tỉnh), zoom 11–15; kiểm tra trạng thái **HOÀN TẤT** trước khi tắt mạng.
 - Dữ liệu đường/biển báo JSON có `series`/`version`, checksum SHA-256 cục bộ và khôi phục bản trước qua Cài đặt. Đây chỉ là kiểm tra toàn vẹn, không xác thực nguồn pháp lý.
 
@@ -25,7 +26,7 @@ Dự án mã nguồn **Thanh Taxi Smart Drive** dành cho tài xế Việt Nam.
 - [Định dạng dữ liệu đường](docs/ROAD-PACK.md)
 - [Đồ thị và xem trước định tuyến offline](docs/ROUTING.md)
 - [Nhập CSV khảo sát, kiểm tra nguồn](docs/SURVEY-PIPELINE.md)
-- [Giới hạn PMTiles và MBTiles](docs/PMTILES-DESIGN.md)
+- [Nhập PMTiles v3 và checklist kiểm thử offline](docs/PMTILES-DESIGN.md)
 
 ## Cảnh báo
 Ứng dụng alpha không phải công cụ xác định pháp lý giới hạn tốc độ; không dùng thay thế quan sát biển báo thực tế. Chưa có camera AI, điều hướng turn-by-turn/offline rerouting, dữ liệu biển báo Việt Nam đã kiểm duyệt hoặc Android Auto template chính thức. Đã có đồ thị tìm đường theo cạnh có cho phép rẽ và bản xem trước khi xe đỗ, nhưng **không có mạng tuyến thực tế**. Tải tile offline cần thử trên thiết bị thật với style được cấp phép, không khẳng định đã hoàn thành gói dữ liệu toàn tỉnh.

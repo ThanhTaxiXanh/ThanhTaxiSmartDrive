@@ -9,6 +9,7 @@ import android.net.Uri
 import com.thanhtaxi.smartdrive.data.RoadPackRepository
 import com.thanhtaxi.smartdrive.offline.OfflineAreaCatalog
 import com.thanhtaxi.smartdrive.offline.OfflineMapsActivity
+import com.thanhtaxi.smartdrive.offline.PmtilesManagerActivity
 import com.thanhtaxi.smartdrive.navigation.RoutePreviewActivity
 
 class SettingsActivity : Activity() {
@@ -48,6 +49,12 @@ class SettingsActivity : Activity() {
             val parked = intent.getBooleanExtra("verifiedStopped", false)
             if (!parked) Toast.makeText(this,"Chỉ tải hoặc sửa gói khi xe dừng, vào từ Dashboard",Toast.LENGTH_LONG).show()
             else startActivity(Intent(this, OfflineMapsActivity::class.java).putExtra("verifiedStopped", true))
+        }
+        action("Nhập và xem thử tệp PMTiles cục bộ (khi xe đỗ)") {
+            if (!intent.getBooleanExtra("verifiedStopped", false))
+                Toast.makeText(this,"Cần dừng xe trước khi mở công cụ",Toast.LENGTH_LONG).show()
+            else startActivity(Intent(this,PmtilesManagerActivity::class.java)
+                .putExtra("verifiedStopped",true))
         }
         heading("Dẫn đường offline — xem trước khi xe đỗ")
         action("Tính thử tuyến trên dữ liệu road pack đã nhập") {

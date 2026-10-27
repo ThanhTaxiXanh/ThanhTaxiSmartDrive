@@ -10,7 +10,7 @@ Safe, offline-capable taxi navigation support in Vietnam; Android Phone Companio
 | 1 | Feasibility, architecture, product requirements, CI structure | implemented documentation |
 | 2 | GPS, map, speed, signs, routing, Free Drive | partial: GPS/map/free drive + conservative sign matching; new offline graph route planner & parked preview, but no field-verified routing coverage |
 | 3 | 4-panel UI, settings, lunar calendar, QR, media, layout presets | partial: standard landscape layout, local settings/image/media; editor/events missing |
-| 4 | AI signs, validated offline road packs, downloadable offline tiles | partial: MapLibre offline region pilot + SHA-256/version rollback + surveyed CSV build pipeline; no AI, signed authoritative data or PMTiles importer |
+| 4 | AI signs, validated offline road packs, downloadable offline tiles | partial: MapLibre offline region pilot + PMTiles v3 SAF importer and raster preview + SHA-256/version rollback + surveyed CSV QA pipeline; no AI or signed authoritative data |
 | 5 | Compliant Android Auto CarAppService and tests | not implemented |
 | 6 | QA, road surveys in Bắc Giang–Bắc Ninh, signed release | not implemented |
 
@@ -35,5 +35,5 @@ The application is not a substitute for visual observation of signs and road con
 - [x] Parked-only route preview over MapLibre and routing JSON importer
 - [x] Deterministic source-ref CSV pack builder + Python test gate in CI
 - [ ] Source verification signatures, national coverage, routing with restrictions
-- [ ] PMTiles/MBTiles archive importer, validated offline map rendering
+- [x] PMTiles v3 importer and raster preview source; [ ] device-proven offline rendering and vector/MBTiles adapters
 - [ ] Android Auto Navigation template and live device driving safety QA

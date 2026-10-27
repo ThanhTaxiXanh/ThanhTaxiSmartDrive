@@ -8,6 +8,7 @@
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:usesCleartextTraffic="false">
         <activity android:name=".navigation.RoutePreviewActivity" android:exported="false"/>
+        <activity android:name=".offline.PmtilesManagerActivity" android:exported="false"/>
         <activity android:name=".offline.OfflineMapsActivity" android:exported="false"/>
         <activity android:name=".SettingsActivity" android:exported="false"/>
         <activity android:name=".MainActivity" android:exported="true"
