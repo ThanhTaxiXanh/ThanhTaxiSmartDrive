@@ -98,7 +98,7 @@ class OfflinePoiActivity : Activity() {
                     found.forEach { place ->
                         results.addView(Button(this).apply {
                             isAllCaps = false
-                            text = "${place.name} • ${place.category}\n${place.address}, ${place.province}\n" +
+                            this.text = "${place.name} • ${place.category}\n${place.address}, ${place.province}\n" +
                                 "${place.lat}, ${place.lon} • Nguồn: ${place.source} " +
                                 "(${if (place.verifiedBySupplier) "Bên cấp đánh dấu đã xem xét" else "Chưa xác minh"})"
                             setOnClickListener {
