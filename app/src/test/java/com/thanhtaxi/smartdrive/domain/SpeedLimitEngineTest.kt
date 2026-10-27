@@ -37,6 +37,17 @@ class SpeedLimitEngineTest {
         assertEquals(LimitStatus.CONFLICT, engine.resolve(road(), signs, 1000).status)
         assertNull(engine.resolve(road(), signs, 1000).kph)
     }
+    @Test fun unreviewedMapCannotClaimLegalCertainty() {
+        val map = SpeedEvidence(40, "seg-10", EvidenceSource.VERIFIED_MAP, reviewed = false)
+        assertEquals(60, engine.resolve(road(), listOf(map), 1000).kph)
+    }
+    @Test fun contradictoryTrustedSourcesAreUnknown() {
+        val signs = listOf(
+            SpeedEvidence(40,"seg-10",EvidenceSource.VERIFIED_SIGN,reviewed=true),
+            SpeedEvidence(50,"seg-10",EvidenceSource.VERIFIED_MAP,reviewed=true))
+        assertEquals(LimitStatus.CONFLICT, engine.resolve(road(),signs,1000).status)
+        assertNull(engine.resolve(road(),signs,1000).kph)
+    }
     @Test fun unreviewedCameraCannotOverrideVerifiedInformation() {
         val sign = SpeedEvidence(40, "seg-10", EvidenceSource.VALIDATED_CAMERA, confidence = 0.99, reviewed = false)
         assertEquals(60, engine.resolve(road(), listOf(sign), 1000).kph)

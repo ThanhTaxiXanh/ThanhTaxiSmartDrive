@@ -51,6 +51,7 @@ class TrafficSignEngine {
                     ((sign.kind == SignKind.P_127 && last.kind == SignKind.P_127 && sign.kph != last.kph) ||
                      (setOf(sign.kind, last.kind) == setOf(SignKind.R_420, SignKind.R_421)))) conflict = true
             }
+            if (sign.kind == SignKind.P_127 && sign.kph !in 5..130) conflict = true
             when (sign.kind) {
                 SignKind.R_420 -> zone = PopulationZone.INSIDE
                 SignKind.R_421 -> zone = PopulationZone.OUTSIDE

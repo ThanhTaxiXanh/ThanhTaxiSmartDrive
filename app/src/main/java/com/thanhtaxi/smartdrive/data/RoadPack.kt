@@ -56,12 +56,18 @@ class RoadPackRepository(private val context: Context) {
                 .lengthMeters in 3.0..2500.0 }) { "Đoạn đường không hợp lệ hoặc dài quá 2,5km" }
         val ids = segments.map { it.id }.toSet()
         val arr = root.optJSONArray("speedSigns")
+        require((arr?.length() ?: 0) <= 25000)
         val signs = if (arr == null) emptyList() else (0 until arr.length()).map { i ->
             val o = arr.getJSONObject(i)
             val id = o.getString("segmentId")
             require(id in ids)
+            val src = EvidenceSource.valueOf(o.getString("source"))
+            require(src == EvidenceSource.VERIFIED_MAP || src == EvidenceSource.UNVERIFIED_MAP) {
+                "speedSigns chỉ nhận dữ liệu thuộc đoạn đường; biển P.127 phải dùng trafficSigns có tọa độ"
+            }
+            require(o.getInt("kph") in 5..130)
             SpeedEvidence(kph = o.getInt("kph"), segmentId = id,
-                source = EvidenceSource.valueOf(o.getString("source")),
+                source = src,
                 direction = o.optString("direction").takeIf { it.isNotBlank() },
                 lane = if (o.has("lane")) o.getInt("lane") else null,
                 validFromEpochMs = o.optLong("validFrom", Long.MIN_VALUE),

@@ -46,8 +46,14 @@ class GeoMatcher {
         if (!fix.latitude.isFinite() || !fix.longitude.isFinite() ||
             fix.latitude !in -90.0..90.0 || fix.longitude !in -180.0..180.0 ||
             !fix.accuracyMeters.isFinite() || fix.accuracyMeters !in 0.0..20.0) return null
+        if ((fix.bearingDegrees != null && !fix.bearingDegrees.isFinite()) ||
+            (fix.speedMetersPerSecond != null && (!fix.speedMetersPerSecond.isFinite() || fix.speedMetersPerSecond < 0)))
+            return null
         val maxDistance = min(17.0, fix.accuracyMeters + 7.0)
-        val good = segments.asSequence().filter { it.reviewed }.mapNotNull { road ->
+        val good = segments.asSequence().filter { it.reviewed &&
+            minOf(kotlin.math.abs(it.aLat - fix.latitude), kotlin.math.abs(it.bLat - fix.latitude)) <= 0.04 &&
+            minOf(kotlin.math.abs(it.aLon - fix.longitude), kotlin.math.abs(it.bLon - fix.longitude)) <= 0.04
+        }.mapNotNull { road ->
             val p = GeoMath.project(fix.latitude, fix.longitude, road)
             if (p.lengthMeters !in 3.0..2500.0 || p.rawFraction < -0.03 || p.rawFraction > 1.03 ||
                 p.crossTrackMeters > maxDistance) return@mapNotNull null

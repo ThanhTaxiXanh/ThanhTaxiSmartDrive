@@ -50,15 +50,16 @@ class SpeedLimitEngine {
             (it.vehicle == null || it.vehicle == context.vehicle) &&
             nowEpochMs in it.validFromEpochMs..it.validUntilEpochMs &&
             it.confidence >= (if (it.source == EvidenceSource.VALIDATED_CAMERA) 0.93 else 0.8) &&
-            (it.source == EvidenceSource.VERIFIED_SIGN || it.source == EvidenceSource.VERIFIED_MAP || it.reviewed)
+            it.reviewed && it.source != EvidenceSource.UNVERIFIED_MAP
         }
         for (source in listOf(EvidenceSource.VERIFIED_SIGN, EvidenceSource.VALIDATED_CAMERA, EvidenceSource.VERIFIED_MAP)) {
             val items = applicable.filter { it.source == source && (source != EvidenceSource.VERIFIED_SIGN || it.reviewed) }
             val limits = items.map { it.kph }.distinct()
             if (limits.size > 1) return LimitResult(null, LimitStatus.CONFLICT, source.name, "Dữ liệu giới hạn tốc độ mâu thuẫn")
             if (limits.size == 1) {
-                val otherVerified = applicable.filter { it.source == EvidenceSource.VERIFIED_SIGN && it.kph != limits[0] }
-                if (otherVerified.isNotEmpty()) return LimitResult(null, LimitStatus.CONFLICT, "conflicting signs", "Cần xác minh biển báo")
+                val disagreement = applicable.any { it.kph != limits[0] }
+                if (disagreement) return LimitResult(null, LimitStatus.CONFLICT,
+                    "conflicting sources", "Các nguồn dữ liệu tốc độ chưa thống nhất")
                 return LimitResult(limits[0], LimitStatus.VERIFIED, source.name, "Dữ liệu áp dụng cho đúng đoạn đường")
             }
         }
