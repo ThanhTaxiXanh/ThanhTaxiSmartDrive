@@ -183,7 +183,12 @@ class RoadPackRepository(private val context: Context) {
                 approvedTurns.length() <= 80000) { "Gói định tuyến vượt giới hạn" }
             val graphNodes = (0 until points.length()).map { i ->
                 val item = points.getJSONObject(i)
-                RouteNode(item.getString("id").trim(), item.getDouble("lat"),item.getDouble("lon"))
+                val label=item.optString("displayName","").trim()
+                require(label.length<=100 && label.none { it.isISOControl() }) {
+                    "Tên nút khảo sát không hợp lệ"
+                }
+                RouteNode(item.getString("id").trim(), item.getDouble("lat"),
+                    item.getDouble("lon"),label.takeIf { it.isNotBlank() })
             }
             val nodeMap = graphNodes.associateBy { it.id }
             val graphEdges = (0 until links.length()).map { i ->

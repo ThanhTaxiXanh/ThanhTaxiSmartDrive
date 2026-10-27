@@ -23,6 +23,19 @@ class SurveyNavigationPreviewTest {
         assertEquals(listOf("A"),SurveyPointSearch.suggestions(graph,"a"))
     }
 
+    @Test fun licensedPackNodeNamesCanBeSearchedButDuplicatesRefused() {
+        val named=OfflineRouteGraph(listOf(
+            RouteNode("A",21.0,106.0,"Bến xe Bắc Ninh"),
+            RouteNode("B",21.0,106.001,"Ga giả lập")),emptyList(),emptyList())
+        assertEquals("A",SurveyPointSearch.resolve(named,"Bến xe Bắc Ninh").nodeId)
+        assertEquals(listOf("Bến xe Bắc Ninh (A)"),
+            SurveyPointSearch.suggestions(named,"Bến xe"))
+        assertEquals("A",SurveyPointSearch.resolve(named,"Bến xe Bắc Ninh (A)").nodeId)
+        val dup=OfflineRouteGraph(listOf(RouteNode("A",21.0,106.0,"Bến xe"),
+            RouteNode("B",21.0,106.01,"Bến xe")),emptyList(),emptyList())
+        assertEquals(SurveyLookupStatus.AMBIGUOUS,
+            SurveyPointSearch.resolve(dup,"Bến xe").status)
+    }
     @Test fun rejectsAmbiguousDistantAndInvalidCoordinates() {
         val close=OfflineRouteGraph(listOf(RouteNode("W",21.0,106.0),
             RouteNode("E",21.0,106.00009)),emptyList(),emptyList())

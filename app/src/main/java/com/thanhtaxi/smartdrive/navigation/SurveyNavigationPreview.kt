@@ -14,10 +14,16 @@ object SurveyPointSearch {
         if (maxResults !in 1..20) return emptyList()
         val q=query.trim()
         if(q.isBlank()) return emptyList()
-        return graph.nodes.keys.asSequence()
-            .filter { it.contains(q,ignoreCase=true) }
-            .sortedWith(compareBy<String> { !it.startsWith(q,ignoreCase=true) }
-                .thenBy { it.length }.thenBy { it })
+        return graph.nodes.values.asSequence()
+            .filter { it.id.contains(q,ignoreCase=true) ||
+                it.displayName?.contains(q,ignoreCase=true)==true }
+            .sortedWith(compareBy<RouteNode> { !it.id.startsWith(q,ignoreCase=true) &&
+                it.displayName?.startsWith(q,ignoreCase=true)!=true }
+                .thenBy { it.id.length }.thenBy { it.id })
+            .map { node ->
+                if(node.displayName.isNullOrBlank()) node.id
+                else "${node.displayName} (${node.id})"
+            }
             .take(maxResults).toList()
     }
 
@@ -25,6 +31,22 @@ object SurveyPointSearch {
         val q=query.trim()
         if(q.isBlank()) return SurveyLookup(null,SurveyLookupStatus.BAD_QUERY,"Chưa nhập nút khảo sát.")
         if(q in graph.nodes) return SurveyLookup(q,SurveyLookupStatus.EXACT_ID,"Đúng mã nút khảo sát.")
+        // Names are read only from the imported, user-licensed survey package.
+        // Never interpret arbitrary address text as a national geocoder result.
+        val idFromLabel=graph.nodes.values.firstOrNull {
+            !it.displayName.isNullOrBlank() &&
+                q.equals("${it.displayName} (${it.id})",ignoreCase=true)
+        }
+        if(idFromLabel!=null) return SurveyLookup(idFromLabel.id,
+            SurveyLookupStatus.EXACT_ID,"Tên điểm từ gói khảo sát đã nhập; chưa xác thực địa chỉ.")
+        val named=graph.nodes.values.filter {
+            !it.displayName.isNullOrBlank() &&
+                q.equals(it.displayName,ignoreCase=true)
+        }
+        if(named.size==1) return SurveyLookup(named[0].id,
+            SurveyLookupStatus.EXACT_ID,"Tên điểm từ gói khảo sát đã nhập; chưa xác thực địa chỉ.")
+        if(named.size>1) return SurveyLookup(null,SurveyLookupStatus.AMBIGUOUS,
+            "Trùng tên điểm trong gói khảo sát; chọn ID cụ thể.")
         val pair=q.split(",")
         if(pair.size!=2) return SurveyLookup(null,SurveyLookupStatus.NOT_FOUND,
             "Chỉ hỗ trợ ID nút đã nhập hoặc tọa độ WGS84 'vĩ độ,kinh độ'; chưa có tìm kiếm địa chỉ.")

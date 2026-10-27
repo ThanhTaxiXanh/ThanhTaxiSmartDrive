@@ -4,7 +4,8 @@ import java.util.PriorityQueue
 import kotlin.math.*
 
 /** Route graph is user-supplied and survey-labelled; reviewed is NOT government certification. */
-data class RouteNode(val id: String, val lat: Double, val lon: Double)
+data class RouteNode(val id: String, val lat: Double, val lon: Double,
+                     val displayName: String? = null)
 data class RouteEdge(
     val id: String, val from: String, val to: String,
     val segmentId: String, val metres: Double, val reviewed: Boolean
@@ -26,7 +27,10 @@ class OfflineRouteGraph(
 
     init {
         require(nodes.size <= 20_000 && edges.size <= 40_000 && turns.size <= 80_000)
-        require(nodes.all { it.id.isNotBlank() && it.lat.isFinite() && it.lon.isFinite() &&
+        require(nodes.all { it.id.isNotBlank() && (it.displayName==null ||
+            (it.displayName.length in 1..100 &&
+                it.displayName.none { c -> c.isISOControl() })) &&
+            it.lat.isFinite() && it.lon.isFinite() &&
             it.lat in -90.0..90.0 && it.lon in -180.0..180.0 })
         require(nodes.distinctBy { it.id }.size == nodes.size) { "Duplicate graph node" }
         require(edges.distinctBy { it.id }.size == edges.size) { "Duplicate graph edge" }
