@@ -61,6 +61,29 @@ class SurveyRoutingQaTests(unittest.TestCase):
         g["edges"][0]["restrictions"]["blockedWindows"][0]["days"]=[0]
         self.assertTrue(errors(g,r))
 
+    def test_vehicle_lane_modeled_speed_and_local_destination_schema(self):
+        g,r=sample()
+        g["edges"][1]["restrictions"]={"allowedLanes":[2,3],
+            "blockedVehicles":["TRUCK"]}
+        g["edges"][0]["modelSpeedKph"]=24.0
+        g["nodes"][1]["aliases"]=["Điểm giả lập B","Fake junction B"]
+        g["destinations"]=[{"id":"poi-1","title":"Điểm đón thử",
+            "nodeId":"B","category":"PICKUP",
+            "aliases":["Diem don","Đón khách"],
+            "sourceRef":"fictional-fixture"}]
+        self.assertEqual([],errors(g,r))
+        g["edges"][1]["restrictions"]["allowedLanes"]=[0]
+        self.assertTrue(errors(g,r))
+        g["edges"][1]["restrictions"]["allowedLanes"]=[2,3]
+        g["edges"][0]["modelSpeedKph"]=float("nan")
+        self.assertTrue(errors(g,r))
+        g["edges"][0]["modelSpeedKph"]=24.0
+        g["destinations"][0]["nodeId"]="NO_NODE"
+        self.assertTrue(errors(g,r))
+        g["destinations"][0]["nodeId"]="B"
+        g["destinations"][0]["aliases"]=["control\\ninvalid"]
+        self.assertTrue(errors(g,r))
+
     def test_display_name_needs_clean_user_supplied_metadata(self):
         g,r=sample()
         g["nodes"][0]["displayName"]="Bến xe"

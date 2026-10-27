@@ -15,24 +15,27 @@ def inspect_routing(routing, roads, add):
     nodes=routing.get("nodes",[])
     edges=routing.get("edges",[])
     turns=routing.get("allowedTurns",[])
-    if not all(isinstance(x,list) for x in (nodes,edges,turns)):
+    places=routing.get("destinations",[])
+    if not all(isinstance(x,list) for x in (nodes,edges,turns,places)):
         add("error","routing","nodes/edges/allowedTurns must all be arrays")
         return
-    if len(nodes)>20000 or len(edges)>40000 or len(turns)>80000:
+    if len(nodes)>20000 or len(edges)>40000 or len(turns)>80000 or len(places)>20000:
         add("error","routing","Graph too large")
         return
     def validate_access(item, identifier):
         if "restrictions" not in item:
             return
         rule=item["restrictions"]
-        if not isinstance(rule,dict) or set(rule)-{"allowedVehicles","blockedWindows"}:
+        if not isinstance(rule,dict) or set(rule)-{"allowedVehicles","blockedVehicles","allowedLanes","blockedWindows"}:
             add("error",identifier,"restrictions must have known fields only")
             return
         if item.get("reviewed") is not True or not isinstance(item.get("sourceRef"),str) or not item["sourceRef"].strip():
             add("error",identifier,"Conditional restriction needs reviewed=true and sourceRef")
         vehicles=rule.get("allowedVehicles")
+        blocked_vehicles=rule.get("blockedVehicles")
+        lanes=rule.get("allowedLanes")
         windows=rule.get("blockedWindows")
-        if vehicles is None and windows is None:
+        if all(x is None for x in (vehicles,blocked_vehicles,lanes,windows)):
             add("error",identifier,"Empty restrictions cannot carry a rule")
         if vehicles is not None:
             known={"TAXI","CAR","MOTORBIKE","BUS","TRUCK","OTHER"}
@@ -40,6 +43,19 @@ def inspect_routing(routing, roads, add):
                 any(not isinstance(x,str) or x not in known for x in vehicles) or
                 len(set(str(x) for x in vehicles))!=len(vehicles)):
                 add("error",identifier,"Invalid allowedVehicles rule")
+        if blocked_vehicles is not None:
+            known={"TAXI","CAR","MOTORBIKE","BUS","TRUCK","OTHER"}
+            if (not isinstance(blocked_vehicles,list) or not 1<=len(blocked_vehicles)<=6 or
+                any(type(x) is not str or x not in known for x in blocked_vehicles) or
+                len(set(str(x) for x in blocked_vehicles))!=len(blocked_vehicles)):
+                add("error",identifier,"Invalid blockedVehicles")
+            elif isinstance(vehicles,list) and set(vehicles)&set(blocked_vehicles):
+                add("error",identifier,"Conflicting allowed/blocked vehicles")
+        if lanes is not None:
+            if (not isinstance(lanes,list) or not 1<=len(lanes)<=12 or
+                any(type(x) is not int or x not in range(1,13) for x in lanes) or
+                len(set(str(x) for x in lanes))!=len(lanes)):
+                add("error",identifier,"Invalid allowedLanes")
         if windows is not None:
             if not isinstance(windows,list) or not 1<=len(windows)<=32:
                 add("error",identifier,"blockedWindows must have 1 to 32 records")
@@ -58,6 +74,15 @@ def inspect_routing(routing, roads, add):
                         start not in range(1440) or end not in range(1440) or start==end):
                         add("error",identifier,"Invalid closure minute range")
 
+    def valid_aliases(item,identifier):
+        if "aliases" not in item:return
+        names=item["aliases"]
+        if(not isinstance(names,list) or len(names)>8 or
+            any(not isinstance(x,str) or not 1<=len(x.strip())<=100 or
+                any(ord(c)<32 or ord(c)==127 for c in x) for x in names) or
+            len(set(str(x).lower().strip() for x in names))!=len(names)):
+            add("error",identifier,"Invalid offline aliases")
+
     ns={};es={}
     for n in nodes:
         if not isinstance(n,dict):
@@ -74,6 +99,7 @@ def inspect_routing(routing, roads, add):
         ):
             add("error",ident,"Survey point displayName must be a short clean string")
         ns[ident]=n
+        valid_aliases(n,ident)
         try:
             lat=float(n["lat"]);lon=float(n["lon"])
             if not math.isfinite(lat) or not math.isfinite(lon) or abs(lat)>90 or abs(lon)>180:
@@ -90,6 +116,11 @@ def inspect_routing(routing, roads, add):
             continue
         es[ident]=e
         validate_access(e,ident)
+        if "modelSpeedKph" in e:
+            speed=e["modelSpeedKph"]
+            if(type(speed) not in (int,float) or not math.isfinite(speed) or
+                not 5<=speed<=110):
+                add("error",ident,"Invalid nonlegal modelSpeedKph")
         a,b=e.get("fromNode"),e.get("toNode")
         segmentId=e.get("segmentId")
         segment=roads.get(segmentId) if isinstance(segmentId,str) else None
@@ -141,3 +172,25 @@ def inspect_routing(routing, roads, add):
             if before is not None and after is not None and (
                 before.get("reviewed") is not True or after.get("reviewed") is not True):
                 add("error","turn","Reviewed turn uses unreviewed edge")
+
+    seen_places=set()
+    for place in places:
+        if not isinstance(place,dict):
+            add("error","destination","Offline destination must be an object")
+            continue
+        ident=place.get("id")
+        if not isinstance(ident,str) or not 1<=len(ident)<=96 or ident in seen_places:
+            add("error","destination","Duplicate or invalid destination ID")
+            continue
+        seen_places.add(ident)
+        title=place.get("title")
+        if not isinstance(title,str) or not 1<=len(title.strip())<=100 or any(
+            ord(ch)<32 or ord(ch)==127 for ch in title):
+            add("error",ident,"Offline destination title invalid")
+        if place.get("nodeId") not in ns:
+            add("error",ident,"Offline destination must point to surveyed node")
+        if place.get("category") not in {"PICKUP","DROPOFF","PARKING","REST","OTHER"}:
+            add("error",ident,"Invalid offline destination category")
+        if not isinstance(place.get("sourceRef"),str) or not 1<=len(place["sourceRef"].strip())<=256:
+            add("error",ident,"Destination lacks sourceRef")
+        valid_aliases(place,ident)
