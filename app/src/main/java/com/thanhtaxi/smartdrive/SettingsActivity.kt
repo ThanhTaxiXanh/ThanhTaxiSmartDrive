@@ -9,6 +9,7 @@ import android.net.Uri
 import com.thanhtaxi.smartdrive.data.RoadPackRepository
 import com.thanhtaxi.smartdrive.offline.OfflineAreaCatalog
 import com.thanhtaxi.smartdrive.offline.OfflineMapsActivity
+import com.thanhtaxi.smartdrive.navigation.RoutePreviewActivity
 
 class SettingsActivity : Activity() {
     companion object { private const val PHOTO = 102; private const val PACK = 103 }
@@ -47,6 +48,12 @@ class SettingsActivity : Activity() {
             val parked = intent.getBooleanExtra("verifiedStopped", false)
             if (!parked) Toast.makeText(this,"Chỉ tải hoặc sửa gói khi xe dừng, vào từ Dashboard",Toast.LENGTH_LONG).show()
             else startActivity(Intent(this, OfflineMapsActivity::class.java).putExtra("verifiedStopped", true))
+        }
+        heading("Dẫn đường offline — xem trước khi xe đỗ")
+        action("Tính thử tuyến trên dữ liệu road pack đã nhập") {
+            if (!intent.getBooleanExtra("verifiedStopped", false))
+                Toast.makeText(this,"Chỉ xem trước khi xe đã dừng",Toast.LENGTH_LONG).show()
+            else startActivity(Intent(this,RoutePreviewActivity::class.java).putExtra("verifiedStopped",true))
         }
         heading("Cảnh báo tốc độ")
         val tolerance = SeekBar(this).apply { max = 10; progress = prefs.getInt("tolerance", 3) }
