@@ -47,3 +47,41 @@ Không có dữ liệu hạn chế hợp pháp/giấy phép đã xác minh, đ�
 ## Đánh giá an toàn
 
 Không suy ra quyền đi đường từ nhãn `reviewed`; nếu bản đồ thiếu kết nối hoặc điều kiện, hiển thị thiếu tuyến khảo sát thay vì tạo lượt rẽ. Android Auto `CarAppService` riêng vẫn chưa có. Các giới hạn đã ghi không được dùng như thông tin tốc độ hợp pháp hoặc hướng dẫn lái tự động.
+
+## Phase 2 — ETA vào từng đoạn, loại xe và làn (bản nâng cấp)
+
+Màn hình xem trước tuyến (**khi đã đỗ**) nay có lựa chọn **TAXI/CAR/MOTORBIKE/BUS/TRUCK/OTHER**, làn **chưa rõ** hoặc làn 1–6 (giả lập). Bộ tìm đường mới `routeTimed` dự báo thời điểm *vào/ra từng cạnh* từ đồng hồ Việt Nam ở lúc tính tuyến và mô hình vận tốc. Trong **Xem các điểm đổi hướng** có bảng giờ `HH:mm` cho từng cạnh; việc khởi hành trên Dashboard kiểm tra lại tuyến để từ chối lựa chọn hết hạn. Khi đang theo tuyến GPS, bản dự báo còn lại được kiểm tra lại theo thời gian; nếu gặp khung cấm khảo sát, hướng dẫn bị tạm ngưng.
+
+Giá trị `routing.edges[].modelSpeedKph` (5–110, không bắt buộc) chỉ là **giả định vận tốc hành trình**. Khi không khai báo, mô hình dùng **30 km/h**. Đây **không phải giới hạn tốc độ hợp pháp, không được ưu tiên hơn biển báo** và không tính kẹt xe, đèn tín hiệu, dừng đón khách hay việc chờ tới khi hết giờ cấm. Nếu một cạnh chỉ đi được sau khi chờ, thuật toán không coi chờ xe là hợp lệ; nó có thể chọn đường khác hoặc không có đường.
+
+Các điều kiện tùy chọn trong `restrictions`:
+
+```json
+{
+  "allowedVehicles": ["TAXI", "CAR"],
+  "blockedVehicles": ["TRUCK"],
+  "allowedLanes": [1, 2],
+  "blockedWindows": [
+    {"days":[1,2,3,4,5], "startMinute":420, "endMinute":540}
+  ]
+}
+```
+
+Khối điều kiện có thể nằm ở cạnh hoặc lượt rẽ. Thiếu loại xe/giờ/làn thì không dùng được điều kiện tương ứng. Nếu chọn làn bằng tay để **mô phỏng**, ứng dụng *không khẳng định GPS biết làn nào*: tuyến có hạn chế theo làn chỉ cho xem thử lúc đỗ, không cho phát hướng dẫn chủ động. Người nhập phải cung cấp `reviewed=true` và `sourceRef`; đây chỉ là nguồn **tự khai**, không phải chứng thực pháp luật.
+
+Có thể bổ sung `routing.nodes[].aliases` (tối đa 8 tên), và `routing.destinations[]` để tra điểm có tên/biệt danh, loại **PICKUP/DROPOFF/PARKING/REST/OTHER** và `nodeId` dẫn đến nút khảo sát thật sự tồn tại. Ví dụ:
+
+```json
+{
+  "id": "demo-pickup-01",
+  "title": "Điểm đón thử nghiệm",
+  "nodeId": "B",
+  "category": "PICKUP",
+  "aliases": ["Diem don", "Dón khách"],
+  "sourceRef": "TEST-NOT-REAL-POI"
+}
+```
+
+Tìm kiếm dùng dữ liệu trong **gói offline đã nhập**, hỗ trợ không dấu và tìm theo nhiều từ; trùng tên buộc người dùng chọn gợi ý có ID. **Không có bộ geocoder địa chỉ toàn quốc, không tự tạo tọa độ của cửa hàng hay nhà dân.**
+
+Fixture [synthetic-restricted-routing.json](../../tools/fixtures/synthetic-restricted-routing.json) đã bổ sung nút và điểm đón/đỗ, làn 2, xe TRUCK bị loại và vận tốc mô hình 24 km/h trên cạnh `bc`. Đây chỉ là bản đồ giả lập — KHÔNG dùng để lái xe thực.

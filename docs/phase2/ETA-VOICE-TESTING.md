@@ -32,3 +32,16 @@ https://developer.android.com/reference/android/speech/tts/Voice
 - Standard Gradle CI + emulator runner API 35 via `.github/workflows/android.yml` and `.github/workflows/android-emulator.yml`.
 
 **Explicitly deferred:** measured accuracy on phone/head unit, map completeness, legal turn controls, ETA benchmarking, Vietnamese TTS subjective quality and automotive audio ducking tests. Unit and emulator results are engineering tests, *not* product/road acceptance.
+
+## ETA theo mỗi cạnh của đồ thị (mô phỏng)
+
+`OfflineRouteGraph.routeTimed` tạo `RoutePlan.schedule[]` gồm thời điểm vào,
+ra và vận tốc mô hình cho từng cạnh khảo sát. Vận tốc mặc định 30 km/h hoặc
+`modelSpeedKph` do người nhập gói khai báo. Thuật toán xét khung hạn chế
+lúc dự kiến đến **mỗi cạnh** và từng nút rẽ, không chỉ giờ khởi hành;
+hiển thị timeline khi xe đỗ. Khi GPS chủ động, nó kiểm tra lại dự báo các
+đoạn còn lại từ thời điểm hiện tại và tạm ẩn chỉ dẫn khi có mâu thuẫn.
+
+Phân biệt: `SimpleEtaEstimator` ước tính thời gian **tổng quãng còn lại**
+từ mẫu tốc độ GPS; `routeTimed` tính thời điểm dự báo vào từng cạnh từ
+mô hình và không được xem là tốc độ giới hạn hợp pháp hoặc dự báo giao thông.

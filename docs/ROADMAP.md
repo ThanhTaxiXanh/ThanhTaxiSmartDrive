@@ -126,3 +126,13 @@ Details: [Phase 2 ETA/voice](phase2/ETA-VOICE-TESTING.md).
 - [ ] National address search; field verification (physical trials deferred)
 
 Document: [Routing restrictions](phase2/ROUTING-RESTRICTIONS.md).
+
+### Preview ETA per edge and local destinations (2026-10-27)
+
+- [x] Time-dependent offline Dijkstra with per-edge model speed; can reject a route when arrival occurs inside a later restriction window
+- [x] Lane-aware / vehicle-exclusion rule schema with conservative unknown-lane behavior
+- [x] Offline destination labels, aliases, category and accent-insensitive ranked autocomplete; unknown names are not geocoded
+- [x] Kotlin/Python safety fixtures and Android API35 instrumentation suite
+- [ ] Legally validated per-lane road map, real measured travel-time distribution, national place dataset, real-driving evidence (deferred)
+
+See [Phase 2 modeled itinerary](phase2/ROUTING-RESTRICTIONS.md).

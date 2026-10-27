@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "series": "synthetic-constraints-demo",
-  "version": 1,
+  "version": 2,
   "title": "DEMO KỸ THUẬT - ĐƯỜNG GIẢ LẬP, KHÔNG PHẢI ĐƯỜNG THỰC",
   "source": "SYNTHETIC GEOMETRY: generated for automated QA; not road authority or OSM extract",
   "license": "Synthetic test fixture only; no roadway or traffic legality assertions",
@@ -85,13 +85,17 @@
         "id": "B",
         "lat": 21,
         "lon": 106.001,
-        "displayName": "Điểm B (giả lập)"
+        "displayName": "Điểm B (giả lập)",
+        "aliases": [
+          "Ga gia lap B",
+          "Diem trung chuyen B"
+        ]
       },
       {
         "id": "C",
         "lat": 21,
         "lon": 106.002,
-        "displayName": "Điểm C (giả lập)"
+        "displayName": "Điểm kết thúc mô phỏng C"
       },
       {
         "id": "D",
@@ -136,8 +140,15 @@
               "startMinute": 420,
               "endMinute": 540
             }
+          ],
+          "allowedLanes": [
+            2
+          ],
+          "blockedVehicles": [
+            "TRUCK"
           ]
-        }
+        },
+        "modelSpeedKph": 24
       },
       {
         "id": "ad",
@@ -179,6 +190,30 @@
         "toEdge": "dc",
         "reviewed": true,
         "sourceRef": "TEST-TURN"
+      }
+    ],
+    "destinations": [
+      {
+        "id": "poi-pickup",
+        "title": "Điểm đón khách thử nghiệm",
+        "nodeId": "B",
+        "category": "PICKUP",
+        "aliases": [
+          "Diem don khach",
+          "Don khach"
+        ],
+        "sourceRef": "SYNTHETIC-NO-REAL-POI"
+      },
+      {
+        "id": "poi-park",
+        "title": "Bãi đỗ xe giả lập",
+        "nodeId": "C",
+        "category": "PARKING",
+        "aliases": [
+          "Bai do",
+          "Do xe"
+        ],
+        "sourceRef": "SYNTHETIC-NO-REAL-POI"
       }
     ]
   }

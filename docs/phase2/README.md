@@ -123,3 +123,13 @@ searched without diacritics. See
 **Still not real traffic-rule certification:** no verified per-vehicle sign
 inventory, lane rules, arrival-time-aware road access, 3D bridge/junction
 model or national geocoding.
+
+## ETA từng cạnh và tìm điểm offline có cấu trúc
+
+- [x] `OfflineRouteGraph.routeTimed`: dự báo thời gian vào/ra từng cạnh trong giới hạn 12 giờ; kiểm tra cửa sổ cấm qua mỗi ranh giới phút và từng lượt rẽ tại thời điểm dự báo tới nút
+- [x] `SurveyAccessRule`: `allowedLanes` và `blockedVehicles`, từ chối ngữ cảnh chưa xác minh; Dashboard không hướng dẫn khi tuyến đòi thông tin làn mà GPS không xác lập được
+- [x] Giao diện khi đỗ: chọn loại xe/làn mô phỏng, xem giờ vào/ra từng đoạn; kiểm tra lại khi bắt đầu GPS và khi thời gian di chuyển thực khác mô hình
+- [x] `OfflineDestinationIndex` cho POI do người dùng nhập, biệt danh không dấu, tìm theo từ và chọn chính xác nhãn ID nếu trùng
+- [ ] Tốc độ thực tế theo từng cạnh, dữ liệu hành chính/địa chỉ và chứng thực hạn chế giao thông; thực nghiệm xe thật được hoãn
+
+Xem [cấu trúc hạn chế và ETA](ROUTING-RESTRICTIONS.md). **Thời gian dự báo của đồ thị khác với ETA từ vận tốc GPS đang chạy**; cả hai đều chỉ mang tính thử nghiệm.

@@ -215,3 +215,17 @@ Tìm tên điểm khảo sát cũng đã hỗ trợ bỏ dấu tiếng Việt.
 
 Toàn bộ dữ liệu hạn chế do người dùng tự khai **chưa được xác minh pháp lý**.
 [Chi tiết và gói kiểm thử giả lập](docs/phase2/ROUTING-RESTRICTIONS.md).
+
+## Phase 2 — Giờ vào từng đoạn, làn xe và điểm đến offline
+
+Tại **Cài đặt → Tính thử tuyến** khi đã đỗ: chọn loại xe (mặc định TAXI),
+làn giả định (**chưa rõ** mặc định), nhập ID/biệt danh có hoặc không dấu hay điểm
+`routing.destinations` trong road pack. Bấm **Tính tuyến thử**; xem ETA mô hình
+và bấm **Xem các điểm đổi hướng** để xem giờ vào/ra từng cạnh đường. Khi
+khởi hành, Dashboard kiểm tra lại thời gian/các hạn chế; tuyến có hạn chế làn
+tự khai không được dùng làm hướng dẫn GPS chắc chắn.
+
+Không coi `modelSpeedKph` là giới hạn pháp lý. Dữ liệu POI/giao thông cần nguồn,
+giấy phép và kiểm tra độc lập trước khi dùng ngoài đường.
+
+[Schema, ví dụ JSON và giới hạn an toàn](docs/phase2/ROUTING-RESTRICTIONS.md).
