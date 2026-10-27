@@ -80,3 +80,24 @@ máy bay hay ảnh bản đồ/biển báo chính xác.
 Bản map có thể vẫn trắng vì archive không có tile hợp lệ, zoom không phù
 hợp, dữ liệu không bao phủ vị trí hoặc thiết bị không hỗ trợ. Phải quan sát
 màn hình thiết bị thật để kết luận bản đồ offline hoạt động.
+
+## Sửa lỗi bị chặn khi nhập PMTiles (10/2026)
+
+Một phiên bản trước đã khóa công cụ PMTiles chỉ dựa vào intent extra
+`verifiedStopped`, thường không có khi Settings được mở qua màn hình dọc
+hoặc sau khi Android khôi phục activity. Vì vậy màn hình hiện
+"Cần dừng xe trước khi mở công cụ" dù xe đang đỗ, và chưa từng mở picker.
+
+Bản sửa cho phép màn hình Settings hỏi trực tiếp người dùng xác nhận
+đã đỗ xe khi GPS không đủ dữ liệu, thay vì mặc định coi là đang lái.
+Nếu GPS mới phát hiện xe đang di chuyển rõ rệt (trong Dashboard), việc
+mở Settings vẫn bị chặn. Không được sử dụng tính năng trong lúc lái.
+
+MapLibre demo world style được tự chuyển *khi sử dụng* sang OpenFreeMap
+Liberty street style; URL tùy chỉnh khác được giữ nguyên.
+
+**Không có PMTiles sẵn trong APK.** Phải có file nguồn hợp lệ và có
+giấy phép offline. Nhập PMTiles có hai bước riêng: chọn file và xác nhận
+quyền dùng, rồi xem thử raster và chọn làm nền Dashboard. MVT vector chưa
+có style tự động.
+

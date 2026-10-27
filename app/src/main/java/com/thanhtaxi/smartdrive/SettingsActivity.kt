@@ -1,6 +1,7 @@
 package com.thanhtaxi.smartdrive
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
@@ -10,11 +11,35 @@ import com.thanhtaxi.smartdrive.data.RoadPackRepository
 import com.thanhtaxi.smartdrive.offline.OfflineAreaCatalog
 import com.thanhtaxi.smartdrive.offline.OfflineMapsActivity
 import com.thanhtaxi.smartdrive.offline.PmtilesManagerActivity
+import com.thanhtaxi.smartdrive.offline.MapStyleDefaults
 import com.thanhtaxi.smartdrive.navigation.RoutePreviewActivity
 
 class SettingsActivity : Activity() {
     companion object { private const val PHOTO = 102; private const val PACK = 103 }
     private val prefs by lazy { getSharedPreferences("taxi", MODE_PRIVATE) }
+
+    /**
+     * Fix: Settings can be restored/launched without the transient GPS "verifiedStopped"
+     * extra. No GPS reading is treated as proof the car is moving. Require an explicit
+     * stationary confirmation before opening interactive import/download tools.
+     */
+    private fun openParkedTool(target: Class<out Activity>) {
+        val launch = {
+            startActivity(Intent(this, target).putExtra("verifiedStopped", true))
+        }
+        if (intent.getBooleanExtra("verifiedStopped", false)) {
+            launch()
+        } else {
+            AlertDialog.Builder(this)
+                .setTitle("Xác nhận xe đang đỗ")
+                .setMessage("Hệ thống chưa xác nhận trạng thái xe dừng. " +
+                    "Chỉ mở công cụ khi đã đỗ xe ở vị trí an toàn, không thao tác khi đang lái.")
+                .setNegativeButton("Hủy", null)
+                .setPositiveButton("Tôi đã đỗ xe") { _, _ -> launch() }
+                .show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(30, 24, 30, 24) }
@@ -34,9 +59,15 @@ class SettingsActivity : Activity() {
         heading("Bản đồ MapLibre")
         val styleInput = EditText(this).apply {
             setSingleLine(true); hint = "HTTPS URL style.json"
-            setText(prefs.getString("style", "https://tiles.openfreemap.org/styles/liberty"))
+            setText(MapStyleDefaults.effective(prefs.getString("style", null)))
         }
         content.addView(styleInput)
+        action("Dùng bản đồ đường phố OpenFreeMap (online)") {
+            styleInput.setText(MapStyleDefaults.STREET_STYLE)
+            prefs.edit().putString("style", MapStyleDefaults.STREET_STYLE)
+                .putString("mapSourceMode", "online").apply()
+            Toast.makeText(this, "Đã chọn bản đồ đường phố, trở lại Dashboard.", Toast.LENGTH_LONG).show()
+        }
         action("Lưu đường dẫn bản đồ") {
             val url = styleInput.text.toString().trim()
             if (OfflineAreaCatalog.validStyleUri(url)) {
@@ -55,21 +86,14 @@ class SettingsActivity : Activity() {
         })
         heading("Bản đồ offline (khi xe đã đỗ)")
         action("Quản lý vùng tải offline Bắc Giang / Bắc Ninh") {
-            val parked = intent.getBooleanExtra("verifiedStopped", false)
-            if (!parked) Toast.makeText(this,"Chỉ tải hoặc sửa gói khi xe dừng, vào từ Dashboard",Toast.LENGTH_LONG).show()
-            else startActivity(Intent(this, OfflineMapsActivity::class.java).putExtra("verifiedStopped", true))
+            openParkedTool(OfflineMapsActivity::class.java)
         }
         action("Nhập và xem thử tệp PMTiles cục bộ (khi xe đỗ)") {
-            if (!intent.getBooleanExtra("verifiedStopped", false))
-                Toast.makeText(this,"Cần dừng xe trước khi mở công cụ",Toast.LENGTH_LONG).show()
-            else startActivity(Intent(this,PmtilesManagerActivity::class.java)
-                .putExtra("verifiedStopped",true))
+            openParkedTool(PmtilesManagerActivity::class.java)
         }
         heading("Dẫn đường offline — xem trước khi xe đỗ")
         action("Tính thử tuyến trên dữ liệu road pack đã nhập") {
-            if (!intent.getBooleanExtra("verifiedStopped", false))
-                Toast.makeText(this,"Chỉ xem trước khi xe đã dừng",Toast.LENGTH_LONG).show()
-            else startActivity(Intent(this,RoutePreviewActivity::class.java).putExtra("verifiedStopped",true))
+            openParkedTool(RoutePreviewActivity::class.java)
         }
         heading("Cảnh báo tốc độ")
         val tolerance = SeekBar(this).apply { max = 10; progress = prefs.getInt("tolerance", 3) }

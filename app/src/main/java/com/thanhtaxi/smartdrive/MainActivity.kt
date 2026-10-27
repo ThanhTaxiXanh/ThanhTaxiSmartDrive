@@ -2,6 +2,7 @@ package com.thanhtaxi.smartdrive
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -30,6 +31,7 @@ import com.thanhtaxi.smartdrive.data.RoadPack
 import com.thanhtaxi.smartdrive.data.RoadPackRepository
 import com.thanhtaxi.smartdrive.domain.*
 import com.thanhtaxi.smartdrive.media.MediaAccessService
+import com.thanhtaxi.smartdrive.offline.MapStyleDefaults
 import com.thanhtaxi.smartdrive.offline.PmtilesArchiveStore
 import com.thanhtaxi.smartdrive.offline.PmtilesHeader
 import com.thanhtaxi.smartdrive.offline.PmtilesRasterStyle
@@ -179,10 +181,7 @@ class MainActivity : Activity(), LocationListener {
             val settings = Button(this).apply {
                 text = "⚙"
                 contentDescription = "Cài đặt khi xe đã đỗ"
-                setOnClickListener {
-                    if (isStopped()) startActivity(Intent(this@MainActivity, SettingsActivity::class.java).putExtra("verifiedStopped", true))
-                    else Toast.makeText(this@MainActivity, "Chỉ cài đặt khi xe dừng", Toast.LENGTH_SHORT).show()
-                }
+                setOnClickListener { openSettingsWhenParked() }
             }
             val width = (68 * resources.displayMetrics.density).toInt()
             val height = (55 * resources.displayMetrics.density).toInt()
@@ -245,8 +244,7 @@ class MainActivity : Activity(), LocationListener {
                 LinearLayout.LayoutParams(-1,0,1f))
             val settings = Button(this).apply {
                 text = "Cài đặt / nhập dữ liệu (chỉ khi xe đỗ)"
-                setOnClickListener { if (isStopped()) startActivity(Intent(this@MainActivity, SettingsActivity::class.java).putExtra("verifiedStopped", true))
-                else Toast.makeText(this@MainActivity,"Dừng xe trước khi cấu hình",Toast.LENGTH_SHORT).show() }
+                setOnClickListener { openSettingsWhenParked() }
             }
             section.addView(settings)
             root.addView(section, LinearLayout.LayoutParams(-1,0,0.38f))
@@ -257,7 +255,7 @@ class MainActivity : Activity(), LocationListener {
         val m = map ?: return
         val mode = prefs.getString("mapSourceMode","online") ?: "online"
         val sha = prefs.getString("pmtilesActiveSha","") ?: ""
-        val url = prefs.getString("style","https://tiles.openfreemap.org/styles/liberty")!!
+        val url = MapStyleDefaults.effective(prefs.getString("style", null))
         val key = if(mode=="pmtiles_raster") "pmtiles:$sha" else "online:$url"
         if(key==selectedStyleKey) return
         selectedStyleKey=key
@@ -315,6 +313,31 @@ class MainActivity : Activity(), LocationListener {
             }
         }
     }
+    private fun openSettingsWhenParked() {
+        val launch = {
+            startActivity(Intent(this, SettingsActivity::class.java).putExtra("verifiedStopped", true))
+        }
+        if (isStopped()) {
+            launch()
+            return
+        }
+        // If fresh GPS explicitly indicates substantial movement, disallow manual
+        // override. Otherwise the fix may be missing/stale/inaccurate while parked.
+        val loc = lastLocation
+        val fresh = SystemClock.elapsedRealtime() - lastFixElapsedMs < 8000L
+        if (fresh && loc != null && loc.hasSpeed() && loc.speed >= 2f) {
+            Toast.makeText(this, "Xe đang di chuyển: chỉ cài đặt sau khi đỗ xe.", Toast.LENGTH_LONG).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Xác nhận xe đã đỗ")
+            .setMessage("GPS không xác nhận được xe đang dừng. " +
+                "Chỉ tiếp tục nếu xe đã đỗ an toàn. Không thao tác khi đang lái.")
+            .setNegativeButton("Hủy",null)
+            .setPositiveButton("Tôi đã đỗ xe") { _, _ -> launch() }
+            .show()
+    }
+
     private fun isStopped(): Boolean {
         val loc = lastLocation ?: return false
         return SystemClock.elapsedRealtime() - lastFixElapsedMs < 5000L &&
