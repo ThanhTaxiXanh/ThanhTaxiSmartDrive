@@ -23,8 +23,11 @@ Dự án mã nguồn **Thanh Taxi Smart Drive** dành cho tài xế Việt Nam.
 - [Kiến trúc và giới hạn nền tảng](docs/ARCHITECTURE.md)
 - [Lộ trình và trạng thái](docs/ROADMAP.md)
 - [Định dạng dữ liệu đường](docs/ROAD-PACK.md)
+- [Đồ thị và xem trước định tuyến offline](docs/ROUTING.md)
+- [Nhập CSV khảo sát, kiểm tra nguồn](docs/SURVEY-PIPELINE.md)
+- [Giới hạn PMTiles và MBTiles](docs/PMTILES-DESIGN.md)
 
 ## Cảnh báo
-Ứng dụng alpha không phải công cụ xác định pháp lý giới hạn tốc độ; không dùng thay thế quan sát biển báo thực tế. Chưa có camera AI, routing/offline routing, dữ liệu biển báo Việt Nam đã kiểm duyệt hoặc Android Auto template chính thức. Tải tile offline cần thử trên thiết bị thật với style được cấp phép, không khẳng định đã hoàn thành gói dữ liệu toàn tỉnh.
+Ứng dụng alpha không phải công cụ xác định pháp lý giới hạn tốc độ; không dùng thay thế quan sát biển báo thực tế. Chưa có camera AI, điều hướng turn-by-turn/offline rerouting, dữ liệu biển báo Việt Nam đã kiểm duyệt hoặc Android Auto template chính thức. Đã có đồ thị tìm đường theo cạnh có cho phép rẽ và bản xem trước khi xe đỗ, nhưng **không có mạng tuyến thực tế**. Tải tile offline cần thử trên thiết bị thật với style được cấp phép, không khẳng định đã hoàn thành gói dữ liệu toàn tỉnh.
 
 Mã nguồn do dự án phát triển; tham khảo bộ SKILL người dùng cung cấp và MapLibre/Android documentation. Không sao chép cơ chế vượt hạn chế nền tảng Android Auto.

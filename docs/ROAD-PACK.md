@@ -82,3 +82,14 @@ trừ thao tác khôi phục rõ ràng. SHA-256 ở đây phát hiện hỏng/ta
 **không** chứng minh gói được cấp bởi cơ quan nhà nước, khảo sát đúng hay số liệu hợp pháp.
 Bước sản xuất cần chữ ký số + khóa tin cậy riêng của đơn vị kiểm duyệt, kiểm tra giấy phép và
 tính hiệu lực pháp lý của văn bản.
+
+## Routing graph tùy chọn
+
+Gói có thể chứa `routing.nodes`, `routing.edges`, `routing.allowedTurns`.
+Phải có node ID, directed edge khớp với từng segment hiện hữu và lượt rẽ
+được phép rõ ràng. Xem [ROUTING.md](ROUTING.md). Đường giao nhau trên hình
+không tự động được coi là giao lộ có thể chuyển hướng.
+
+Muốn tạo JSON từ CSV khảo sát có kiểm tra nguồn, xem
+[SURVEY-PIPELINE.md](SURVEY-PIPELINE.md). Công cụ CSV mặc định không đánh dấu
+bất kỳ đoạn/biển nào là đã duyệt.
