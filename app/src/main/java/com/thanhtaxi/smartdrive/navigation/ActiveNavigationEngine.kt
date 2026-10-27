@@ -188,7 +188,8 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
                 return last
             }
             val destination=plan.nodeIds.last()
-            val (lookup, candidate)=SurveyReroutePreview.candidate(graph,fix.lat,fix.lon,destination)
+            val (lookup, candidate)=SurveyReroutePreview.candidate(
+                graph,fix.lat,fix.lon,destination,context=plan.accessContext)
             // Never auto-switch to a candidate or emit a turn instruction.
             proposal=candidate?.takeIf { it.edgeIds.isNotEmpty() && it.edgeIds!=plan.edgeIds }
             last=NavigationUpdate(NavigationPhase.OFF_ROUTE,

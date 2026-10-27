@@ -193,6 +193,11 @@ class RoutePreviewActivity : Activity() {
                         putStringArrayListExtra("navigationNodes",ArrayList(p.nodeIds))
                         putStringArrayListExtra("navigationEdges",ArrayList(p.edgeIds))
                         putExtra("navigationMeters",p.metres)
+                        p.accessContext?.let { context ->
+                            putExtra("routeVehicle",context.vehicle.name)
+                            putExtra("routeDay",context.dayOfWeek)
+                            putExtra("routeMinute",context.minuteOfDay)
+                        }
                         putExtra("navigationVoiceOptIn",optionalSpeech.isChecked)
                     })
                     finish()
@@ -307,7 +312,7 @@ class RoutePreviewActivity : Activity() {
                     "MÔ PHỎNG: dữ liệu không hợp lệ hoặc thiếu cạnh được duyệt."
                 RouteDeviationState.OFF_ROUTE -> {
                     val (lookup, alternative)=SurveyReroutePreview.candidate(
-                        g,lat,lon,destination,100.0)
+                        g,lat,lon,destination,100.0,plan.accessContext)
                     pendingAlternative=alternative?.takeIf { it.edgeIds.isNotEmpty() }
                     acceptAlternative.isEnabled=pendingAlternative!=null
                     if(pendingAlternative!=null)
@@ -357,7 +362,9 @@ class RoutePreviewActivity : Activity() {
             routeStatus.text="Đang tính đồ thị có hướng cục bộ…"
             background.execute {
                 val result=runCatching {
-                    val route=g.route(origin,destination)
+                    val context=RouteAccessContext.atVietnamTime(
+                        RoutingVehicle.TAXI,System.currentTimeMillis())
+                    val route=g.route(origin,destination,context)
                     if (route != null) RoutePreviewInstructions.generate(g,route)
                     route
                 }

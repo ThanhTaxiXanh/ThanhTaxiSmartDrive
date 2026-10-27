@@ -140,11 +140,12 @@ class RouteDeviationMonitor(
  */
 object SurveyReroutePreview {
     fun candidate(graph: OfflineRouteGraph, lat: Double,lon:Double,destinationId:String,
-                  radiusMeters:Double=100.0): Pair<SurveyLookup, RoutePlan?> {
+                  radiusMeters:Double=100.0,
+                  context:RouteAccessContext?=null): Pair<SurveyLookup, RoutePlan?> {
         val q="${lat},${lon}"
         val located=SurveyPointSearch.resolve(graph,q,radiusMeters)
         val id=located.nodeId ?:return located to null
-        if(id==destinationId) return located to graph.route(id,id)
-        return located to graph.route(id,destinationId)
+        if(id==destinationId) return located to graph.route(id,id,context)
+        return located to graph.route(id,destinationId,context)
     }
 }

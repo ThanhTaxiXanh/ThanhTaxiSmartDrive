@@ -41,10 +41,12 @@ object RoutePreviewInstructions {
         val edges=plan.edgeIds.map { id -> requireNotNull(graph.edge(id)) { "Unknown route edge" } }
         for (i in edges.indices) {
             val e=edges[i]
-            require(e.reviewed && e.from==plan.nodeIds[i] && e.to==plan.nodeIds[i+1]) {
+            require(graph.isEdgeAllowed(e.id,plan.accessContext) &&
+                e.from==plan.nodeIds[i] && e.to==plan.nodeIds[i+1]) {
                 "Route edge is not reviewed or does not connect the claimed nodes"
             }
-            if (i>0) require(graph.hasReviewedTurn(edges[i-1].id,e.id)) {
+            if (i>0) require(graph.hasReviewedTurn(
+                edges[i-1].id,e.id,plan.accessContext)) {
                 "No reviewed connection between surveyed segments"
             }
         }

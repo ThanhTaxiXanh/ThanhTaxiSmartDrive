@@ -38,6 +38,8 @@ import com.thanhtaxi.smartdrive.navigation.NavigationFix
 import com.thanhtaxi.smartdrive.navigation.NavigationPhase
 import com.thanhtaxi.smartdrive.navigation.NavigationUpdate
 import com.thanhtaxi.smartdrive.navigation.RoutePlan
+import com.thanhtaxi.smartdrive.navigation.RouteAccessContext
+import com.thanhtaxi.smartdrive.navigation.RoutingVehicle
 import com.thanhtaxi.smartdrive.navigation.RoutePreviewInstructions
 import org.maplibre.android.annotations.Polyline
 import org.maplibre.android.annotations.PolylineOptions
@@ -716,6 +718,16 @@ class MainActivity : Activity(), LocationListener {
         val routeEdges=source?.getStringArrayListExtra("navigationEdges")
         if(routeNodes==null || routeEdges==null) return
         val metres=source.getDoubleExtra("navigationMeters",Double.NaN)
+        val routeVehicle=source.getStringExtra("routeVehicle")
+        val routeDay=source.getIntExtra("routeDay",-1)
+        val routeMinute=source.getIntExtra("routeMinute",-1)
+        val routeContext=runCatching {
+            if(routeVehicle==null) null else RouteAccessContext(
+                RoutingVehicle.valueOf(routeVehicle),routeDay,routeMinute)
+        }.getOrNull()
+        source.removeExtra("routeVehicle")
+        source.removeExtra("routeDay")
+        source.removeExtra("routeMinute")
         val userOptedIn=source.getBooleanExtra("navigationVoiceOptIn",false)
         source.removeExtra("navigationVoiceOptIn")
         source.removeExtra("navigationNodes")
@@ -737,12 +749,12 @@ class MainActivity : Activity(), LocationListener {
         promptPolicy.reset()
         navPanel.visibility=View.VISIBLE
         navText.text="Đang xác thực và nạp tuyến có hướng…"
-        val copy=RoutePlan(routeNodes.toList(),routeEdges.toList(),metres)
+        val copy=RoutePlan(routeNodes.toList(),routeEdges.toList(),metres,routeContext)
         navWorker.execute {
             val nav=runCatching {
                 val total=copy.edgeIds.sumOf { id ->
                     val e=requireNotNull(graph.edge(id))
-                    require(e.reviewed)
+                    require(graph.isEdgeAllowed(id,copy.accessContext))
                     e.metres
                 }
                 require(kotlin.math.abs(total-copy.metres)<0.25)
