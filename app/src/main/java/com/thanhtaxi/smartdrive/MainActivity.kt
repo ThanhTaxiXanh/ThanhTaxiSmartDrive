@@ -71,6 +71,8 @@ class MainActivity : Activity(), LocationListener {
     private var selectedStyleKey: String? = null
     private var currentStyleEpoch = 0
     private var offlineHeader: PmtilesHeader? = null
+    private val followCamera = FreeDriveCameraState()
+    private lateinit var followButton: Button
 
     private var lastLocation: Location? = null
     private var lastFixElapsedMs = 0L
@@ -150,8 +152,32 @@ class MainActivity : Activity(), LocationListener {
         }
         mapView.getMapAsync { readyMap ->
             map = readyMap
+            readyMap.addOnCameraMoveStartedListener { reason ->
+                if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
+                    followCamera.userPanned()
+                    updateFollowButton()
+                }
+            }
             loadSelectedMap()
         }
+        followButton = Button(this).apply {
+            text = "◎ Theo xe"
+            contentDescription = "Bật hoặc tắt bám vị trí xe trên bản đồ"
+            setOnClickListener {
+                if (followCamera.following) {
+                    followCamera.userPanned()
+                } else {
+                    followCamera.resume()
+                    lastLocation?.let { follow(it) }
+                }
+                updateFollowButton()
+            }
+        }
+        mapPane.addView(followButton, FrameLayout.LayoutParams(dp(118),dp(50),
+            Gravity.BOTTOM or Gravity.LEFT).apply {
+            bottomMargin = dp(38)
+            leftMargin = dp(5)
+        })
         val info = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(8, 8, 8, 8)
@@ -251,6 +277,10 @@ class MainActivity : Activity(), LocationListener {
             root.addView(section, LinearLayout.LayoutParams(-1,0,0.38f))
         }
         setContentView(root)
+    }
+    private fun updateFollowButton() {
+        if (::followButton.isInitialized)
+            followButton.text = if (followCamera.following) "◎ Theo xe" else "◎ Tới xe"
     }
     private fun loadSelectedMap() {
         val m = map ?: return
@@ -390,13 +420,15 @@ class MainActivity : Activity(), LocationListener {
             mapStatusLabel.text="GPS ngoài phạm vi PMTiles: xem tâm vùng bản đồ đã nhập."
             return
         }
-        if (location.hasAccuracy() && location.accuracy <= 40f) {
+        val gpsGood = location.hasAccuracy() && location.accuracy <= 40f
+        if (gpsGood) {
             vehicleMarker?.let { m.removeMarker(it) }
             vehicleMarker = m.addMarker(MarkerOptions()
                 .position(LatLng(location.latitude, location.longitude))
                 .title("GPS: vị trí ước tính của xe")
                 .icon(positionIcon()))
         }
+        if (!followCamera.shouldCenter(gpsGood, true)) return
         m.cameraPosition = CameraPosition.Builder()
             .target(LatLng(location.latitude, location.longitude))
             .zoom(if(local==null) 16.0 else 16.0.coerceIn(
