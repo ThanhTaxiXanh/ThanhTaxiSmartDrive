@@ -20,6 +20,7 @@ class OfflineRouteGraph(
 ) {
     val nodes: Map<String, RouteNode>
     private val outgoing: Map<String, List<RouteEdge>>
+    private val edgesById: Map<String, RouteEdge>
     private val allowed: Set<Pair<String, String>>
     private val validatedSegmentTransitions: Set<Pair<String,String>>
 
@@ -34,6 +35,7 @@ class OfflineRouteGraph(
             it.from in this.nodes && it.to in this.nodes && it.from != it.to &&
             it.metres.isFinite() && it.metres in 2.0..3000.0 })
         val edgeById = edges.associateBy { it.id }
+        edgesById = edgeById
         require(turns.all {
             val before = edgeById[it.fromEdge]
             val after = edgeById[it.toEdge]
@@ -59,6 +61,9 @@ class OfflineRouteGraph(
     fun isValidatedSegmentTransition(fromSegmentId: String, toSegmentId: String): Boolean =
         fromSegmentId == toSegmentId ||
             (fromSegmentId to toSegmentId) in validatedSegmentTransitions
+
+    /** Returns the surveyed directed edge for route-preview generation only. */
+    fun edge(id: String): RouteEdge? = edgesById[id]
 
     /**
      * Dijkstra over (node, preceding directed edge). Every intermediate turn
