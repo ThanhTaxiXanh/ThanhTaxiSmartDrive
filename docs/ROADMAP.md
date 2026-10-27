@@ -14,7 +14,7 @@ passed road trials, hardware tests, legal certification or Android Auto integrat
 | Phase | Master Prompt scope | Current evidence / state |
 |---|---|---|
 | **1** | Analyze SKILL and upstream references; Android Auto SDK; architecture; licenses; four-region feasibility | **COMPLETE: architecture baseline** — PRD, feasibility review, SDK and licenses, data model, head-unit/Android Auto wireframes, 44 traced requirements, ADRs, risk gates and CI documentation guard |
-| **2** | GPS, map matching, Free Drive, signs, speed/PIP/alerts and routing | **IN PROGRESS** — Kotlin GPS/MapLibre, road matcher and graph preview; actual field data, routing, speed PIP and road acceptance incomplete |
+| **2** | GPS, map matching, Free Drive, signs, speed/PIP/alerts and routing | **IN PROGRESS** — implemented trust-labeled Speed PIP, sign/GPS matching and alert policy; no field-verified road data, production routing/search or actual device acceptance. See [Phase 2 matrix](phase2/README.md) |
 | **3** | 4-panel Dashboard, layout editor, themes, calendar, QR, Media and settings | **PARTIAL PROTOTYPE** — custom Activity, lunar calendar/QR/Media; editable layouts, events/themes and responsive device QA missing |
 | **4** | Camera AI, offline map/sign packs, validation and updates | **PARTIAL PROTOTYPE** — PMTiles and QA; AI, signed legal data, full region coverage and device-proven offline render missing |
 | **5** | Android Auto CarAppService, navigation templates and host tests | **NOT IMPLEMENTED** — current APK will not show as Android Auto app |
