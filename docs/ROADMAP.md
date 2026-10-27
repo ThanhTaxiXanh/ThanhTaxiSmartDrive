@@ -67,3 +67,15 @@ The application is not a substitute for visual observation of signs and road con
 - [x] Source/edge/turn topology structural QA gate in Python CI
 - [x] Route preview can use the active local raster/vector PMTiles basemap after SHA-256 check
 - [ ] Device trial with validated regional road packs; road restrictions, turns by vehicle/time and Android Auto navigation
+
+### Phase 2 follow-up (2026-10-27)
+
+- [x] Surveyed-node ID / WGS84-coordinate lookup with ambiguity rejection
+- [x] Route-deviation detector requiring repeated fresh fixes with quality checks
+- [x] Parked-only **synthetic** GPS simulation and explicit optional alternate preview
+- [ ] Vietnamese address/POI search from properly licensed index or geocoder
+- [ ] Navigation-grade GPS-to-route matcher, live deviation + safe reroute/ETA/voice
+- [ ] Real vehicle and field-survey acceptance of signage and legal constraints
+
+See [Phase 2 report](phase2/README.md). These checkmarks indicate
+**code-level capabilities, not field acceptance or completion of Phase 2**.

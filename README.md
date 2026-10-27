@@ -144,3 +144,14 @@ node ID thuộc bộ dữ liệu `routing`, bấm Tính tuyến thử rồi
 trên đường thật. Nền bản đồ thử tương thích cả PMTiles cục bộ đã nhập
 và style online đã chọn. Chưa có bản đồ đường được kiểm định cho toàn
 Bắc Giang–Bắc Ninh; cũng chưa có Android Auto CarAppService.
+
+## Phase 2 — Thử tìm nút khảo sát và lệch tuyến (khi đỗ xe)
+
+Màn hình Cài đặt → **Tính thử tuyến trên dữ liệu road pack đã nhập** nay
+nhận ID nút hoặc tọa độ dạng `21.12345,106.54321` gần một nút có trong
+graph. Đây **không phải tìm kiếm địa chỉ trên toàn Việt Nam**.
+Sau khi tính tuyến thử, có thể nhập tọa độ *giả lập*, bấm
+**Mô phỏng 3 GPS** và, nếu có tuyến khảo sát hợp lệ khác, bấm
+**Xem tuyến khác**. Không kết nối với GPS thật để tự điều hướng, không có
+mệnh lệnh rẽ hay ETA tin cậy. Xem
+[giới hạn Phase 2](docs/phase2/README.md).

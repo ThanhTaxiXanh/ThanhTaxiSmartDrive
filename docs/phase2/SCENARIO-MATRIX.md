@@ -22,3 +22,16 @@ they **do not authorize legal speed limits**.
 | Repeated audible alerts | SpeedAlertDebouncerTest | Suppress sound bursts; reset on unknown |
 
 All tests must continue to pass on GitHub Actions. A passing test only verifies its assumptions; the missing coverage in the field protocol remains mandatory.
+
+## Synthetic destination/deviation cases (new)
+
+| Scenario | Test | Expected |
+|---|---|---|
+| Exact node ID or near coordinate | SurveyNavigationPreviewTest | Resolve the specific surveyed node only |
+| Unknown street name / faraway coordinate | SurveyNavigationPreviewTest | NOT_FOUND, never invoke external geocoder or invent route |
+| Two nearby junctions at comparable distances | SurveyNavigationPreviewTest | AMBIGUOUS; no automatic snap |
+| One off-route GPS sample | SurveyNavigationPreviewTest | SUSPECTED, no immediate reroute |
+| 3 distinct consecutive off-route samples | SurveyNavigationPreviewTest | OFF_ROUTE as *simulation only* |
+| Duplicate timestamp / unreliable GPS / long gap | SurveyNavigationPreviewTest | No false confidence |
+| Alternate route from reviewed directed graph | SurveyNavigationPreviewTest | Only traversable approved edges and turns |
+| Route against direction | SurveyNavigationPreviewTest | No alternative |

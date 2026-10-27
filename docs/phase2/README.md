@@ -15,8 +15,10 @@ Master Prompt Phase 2 requires map, GPS/Free Drive, road-aware speed limits, PIP
 | Sign awareness | `TrafficSignEngine` R.420/R.421/P.127/explicit survey end marker, directional segment matching, 800m upcoming preview | Code; legal applicability and current national coverage pending |
 | GPS road matching | Spatial index, heading/accuracy rejection, parallel-road ambiguity, 3 unique samples, reviewed turn topology | Code; bridges and intersections need field trial |
 | Source verification | User `reviewed=true` + `sourceRef` is **SURVEY_REPORTED**, not VERIFIED | Code; signed authoritative pack verifier not implemented |
-| Map search/POI | No licensed Vietnamese geocoder/POI index | NOT IMPLEMENTED |
-| Production turn-by-turn, alternatives, ETA, rerouting, voice | Parked-only Dijkstra preview and geometry step description | PARTIAL PROTOTYPE, NOT navigation |
+| Survey node/coordinate lookup | Case-insensitive node ID suggestions; exact ID or WGS84 near uniquely matched node ≤75m | ALPHA PARKED-ONLY; **not address/POI search** |
+| Map search/POI | No licensed Vietnamese address or POI geocoder | NOT IMPLEMENTED |
+| Route deviation and alternative preview | Three distinct consistent simulated fixes, uncertainty/ambiguity checks, candidate route only from surveyed nearby node with approved edge turns | ALPHA simulation **parked only**, NOT real GPS rerouting |
+| Production turn-by-turn, alternatives, ETA, rerouting, voice | No live turn instructions, licensed address search or rerouting in motion | NOT IMPLEMENTED |
 | Field/regulatory evidence | No independently inspected regional sign pack or road-trial record | NOT DONE |
 
 ## Speed PIP trust contract
@@ -45,3 +47,29 @@ Unit integration replay is synthetic, not an actual approved road or sign datase
 - Master Prompt requirements: [Phase 1 traceability](../phase1/REQUIREMENTS.csv)
 
 See [field trial protocol](FIELD-TRIAL-PROTOCOL.md) before any Phase 2 closeout.
+
+## Parked route selection and deviation *simulation*
+
+Open **Settings → Tính thử tuyến trên dữ liệu road pack đã nhập** after
+parking. A road pack with `routing.nodes`, `routing.edges` and
+`routing.allowedTurns` is required, with user-asserted `reviewed`
+edge and turn flags (not legal validation).
+
+1. Enter start and finish **existing node IDs** or coordinates like
+   `21.12345,106.54321`. Coordinates are accepted only if one unique
+   node exists within 75 m. Near ties within 20 m or unknown/distant points
+   are refused. This is **not** address/POI search for Vietnam.
+2. Tap **Tính tuyến thử** and inspect surveyed directed edges.
+3. Enter a hypothetical GPS coordinate into the simulation field and tap
+   **Mô phỏng 3 GPS**. The program creates three synthetic timestamped
+   observations explicitly for offline algorithm demonstration. It does
+   **not** use the device's live GPS or assert actual travel.
+4. For a simulated deviation (cross-track over 30 m or 2×accuracy),
+   the app proposes a new route only if a unique surveyed junction is
+   within 100 m and Dijkstra can traverse surveyed **directed**
+   edges/approved turns to the original destination.
+5. A proposed alternative is **never automatically applied**; tap
+   **Xem tuyến khác** (while parked) to inspect it.
+
+Do not use this feature to issue instructions to a moving driver. No
+live ETA/voice/location following/rerouting is implemented.
