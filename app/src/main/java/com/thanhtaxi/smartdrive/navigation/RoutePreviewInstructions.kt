@@ -38,15 +38,24 @@ object RoutePreviewInstructions {
         require(plan.metres.isFinite() && plan.metres>=0.0)
         require(plan.nodeIds.all { it in graph.nodes })
         if(plan.edgeIds.isEmpty()) return emptyList()
+        if(plan.schedule.isNotEmpty()) require(graph.isScheduledPlanValid(plan)) {
+            "Segment arrival schedule contains a banned/invalid surveyed edge or turn"
+        }
         val edges=plan.edgeIds.map { id -> requireNotNull(graph.edge(id)) { "Unknown route edge" } }
         for (i in edges.indices) {
             val e=edges[i]
-            require(graph.isEdgeAllowed(e.id,plan.accessContext) &&
+            val ctx=if(plan.schedule.isNotEmpty()) {
+                val info=plan.schedule[i]
+                RouteAccessContext.atVietnamTime(
+                    requireNotNull(plan.accessContext).vehicle,info.enterEpochMs,
+                    plan.accessContext.lane)
+            } else plan.accessContext
+            require(graph.isEdgeAllowed(e.id,ctx) &&
                 e.from==plan.nodeIds[i] && e.to==plan.nodeIds[i+1]) {
                 "Route edge is not reviewed or does not connect the claimed nodes"
             }
             if (i>0) require(graph.hasReviewedTurn(
-                edges[i-1].id,e.id,plan.accessContext)) {
+                edges[i-1].id,e.id,ctx)) {
                 "No reviewed connection between surveyed segments"
             }
         }
@@ -89,8 +98,19 @@ object RoutePreviewInstructions {
             items.add("${i+1}. Nút ${step.atNodeId} (sau %.0f m): ${step.text}"
                 .format(java.util.Locale.ROOT,step.metresFromStart))
         }
-        items.add("Lượt rẽ chỉ là dữ liệu do người nhập đánh dấu reviewed. " +
-            "Chưa có biển cấm, làn, cầu vượt, giờ cấm hoặc kiểm chứng pháp lý.")
+        if(plan.schedule.isNotEmpty()) {
+            val formatter=java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+            val zone=java.time.ZoneId.of("Asia/Ho_Chi_Minh")
+            items.add("GIỜ ĐẾN TỪNG CẠNH: giả định tốc độ mô hình, không phải dự báo giao thông.")
+            plan.schedule.forEachIndexed { i,s ->
+                val enter=java.time.Instant.ofEpochMilli(s.enterEpochMs).atZone(zone)
+                val exit=java.time.Instant.ofEpochMilli(s.exitEpochMs).atZone(zone)
+                items.add("${i+1}. ${s.edgeId}: ${enter.format(formatter)}–${exit.format(formatter)} " +
+                    "(mô hình ${s.modelSpeedKph.toInt()} km/h; KHÔNG phải tốc độ giới hạn)")
+            }
+        }
+        items.add("Quy tắc làn/giờ/xe và lượt rẽ chỉ do người nhập khảo sát; " +
+            "không có bằng chứng pháp lý độc lập, không phải hướng dẫn lái.")
         return items.joinToString("\n\n")
     }
 }

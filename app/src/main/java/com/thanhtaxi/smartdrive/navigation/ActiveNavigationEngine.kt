@@ -114,7 +114,15 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
         // Imported time windows are checked again for each fix, not only
         // at route selection. If current civil time is unavailable or the
         // survey rule changes status, suspend geometry commentary.
-        if(graph.hasConditionalRules(plan)) {
+        if(graph.hasLaneScopedRules(plan)) {
+            // Android GPS cannot establish which surveyed lane the taxi occupies.
+            // A manually selected lane is enough for a parked WHAT-IF preview,
+            // never for authoritative moving-vehicle guidance.
+            return suspendForUncertainGps()
+        }
+        if(plan.schedule.isNotEmpty() && !graph.isScheduledPlanValid(plan))
+            return suspendForUncertainGps()
+        if(graph.hasConditionalRules(plan) && plan.schedule.isEmpty()) {
             val ctx=plan.accessContext
             if(ctx==null || nowEpochMs==null || nowEpochMs<0)
                 return suspendForUncertainGps()

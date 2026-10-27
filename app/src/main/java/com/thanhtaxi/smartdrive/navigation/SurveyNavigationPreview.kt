@@ -115,9 +115,13 @@ class RouteDeviationMonitor(
         var best=Double.POSITIVE_INFINITY
         for (i in route.edgeIds.indices) {
             val edge=graph.edge(route.edgeIds[i]) ?:run { reset();return last }
-            if(!edge.reviewed || edge.from!=route.nodeIds[i] ||
+            val laneCtx=if(route.schedule.isNotEmpty() && route.accessContext!=null)
+                RouteAccessContext.atVietnamTime(route.accessContext.vehicle,
+                    route.schedule[i].enterEpochMs,route.accessContext.lane)
+                else route.accessContext
+            if(!graph.isEdgeAllowed(edge.id,laneCtx) || edge.from!=route.nodeIds[i] ||
                 edge.to!=route.nodeIds[i+1] ||
-                (i>0 && !graph.hasReviewedTurn(route.edgeIds[i-1],edge.id))) {
+                (i>0 && !graph.hasReviewedTurn(route.edgeIds[i-1],edge.id,laneCtx))) {
                 reset()
                 return last
             }
