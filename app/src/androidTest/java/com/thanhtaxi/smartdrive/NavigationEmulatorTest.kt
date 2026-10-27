@@ -80,6 +80,59 @@ class NavigationEmulatorTest {
         assertFalse(speaker.available)
     }
 
+    @Test fun importerEnforcesTaxiVehicleAndTimedSurveyClosuresOnEmulator() {
+        // Fully synthetic import; no file persistence or device GPS.
+        val json="""{
+          "schema":1,"series":"emulator-fake","version":1,
+          "title":"Fictitious survey","source":"Emulator test only","license":"TEST",
+          "segments":[
+            {"id":"r1","from":[21.0,106.0],"to":[21.0,106.001],
+             "roadKind":"TWO_WAY_OR_SINGLE_LANE_ONEWAY","populationZone":"UNKNOWN",
+             "reviewed":true,"sourceRef":"fake-survey-a"},
+            {"id":"r2","from":[21.0,106.001],"to":[21.0,106.002],
+             "roadKind":"TWO_WAY_OR_SINGLE_LANE_ONEWAY","populationZone":"UNKNOWN",
+             "reviewed":true,"sourceRef":"fake-survey-b"}
+          ],
+          "routing":{
+            "nodes":[{"id":"A","lat":21.0,"lon":106.0},
+                     {"id":"B","lat":21.0,"lon":106.001},
+                     {"id":"C","lat":21.0,"lon":106.002}],
+            "edges":[
+              {"id":"ab","segmentId":"r1","fromNode":"A","toNode":"B",
+               "direction":"forward","distanceMeters":104.0,"reviewed":true,
+               "sourceRef":"fake-edge-a"},
+              {"id":"bc","segmentId":"r2","fromNode":"B","toNode":"C",
+               "direction":"forward","distanceMeters":104.0,"reviewed":true,
+               "sourceRef":"fake-edge-b","restrictions":{
+                 "allowedVehicles":["TAXI"],
+                 "blockedWindows":[{"days":[1,2,3,4,5],
+                  "startMinute":420,"endMinute":540}]
+               }}
+            ],
+            "allowedTurns":[{"fromEdge":"ab","viaNode":"B","toEdge":"bc",
+                             "reviewed":true,"sourceRef":"fake-turn-b"}]
+          }
+        }"""
+        val app=InstrumentationRegistry.getInstrumentation().targetContext
+        val graph=com.thanhtaxi.smartdrive.data.RoadPackRepository(app)
+            .parse(json).routeGraph!!
+        assertNull(graph.route("A","C"))
+        assertNull(graph.route("A","C",
+            RouteAccessContext(RoutingVehicle.CAR,7,600)))
+        assertNull(graph.route("A","C",
+            RouteAccessContext(RoutingVehicle.TAXI,1,480)))
+        val plan=graph.route("A","C",
+            RouteAccessContext(RoutingVehicle.TAXI,1,540))
+        assertEquals(listOf("ab","bc"),plan?.edgeIds)
+        assertEquals(1,RoutePreviewInstructions.generate(graph,plan!!).size)
+        try {
+            com.thanhtaxi.smartdrive.data.RoadPackRepository(app).parse(
+                json.replace("\"allowedVehicles\":[\"TAXI\"]",
+                    "\"allowedVehicles\":[\"ILLEGAL_VALUE\"]"))
+            fail("reject unsupported vehicle")
+        } catch (_: IllegalArgumentException) {}
+    }
+
     @Test fun mainDashboardCreatesWithoutRealGpsHardware() {
         // Validates the Android Activity, map widget and dashboard lifecycle on
         // the emulator; offline tiles and GPS measurement are tested separately.
