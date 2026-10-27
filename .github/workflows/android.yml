@@ -25,6 +25,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Validate surveyed CSV import pipeline
+        run: python3 -m unittest discover -s tools/tests -v
       - name: Unit tests and APK build
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
       - name: Upload installable debug APK
