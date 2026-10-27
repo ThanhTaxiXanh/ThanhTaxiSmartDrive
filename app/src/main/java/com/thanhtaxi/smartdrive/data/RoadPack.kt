@@ -181,6 +181,39 @@ class RoadPackRepository(private val context: Context) {
             val approvedTurns = routing.getJSONArray("allowedTurns")
             require(points.length() <= 20000 && links.length() <= 40000 &&
                 approvedTurns.length() <= 80000) { "Gói định tuyến vượt giới hạn" }
+            fun parseAccess(item: JSONObject): SurveyAccessRule {
+                if(!item.has("restrictions")) return SurveyAccessRule()
+                val rule=item.optJSONObject("restrictions")
+                    ?:throw IllegalArgumentException("restrictions phải là object")
+                require(item.optBoolean("reviewed",false) &&
+                    item.optString("sourceRef","").isNotBlank()) {
+                    "Quy định hạn chế cần dấu reviewed và sourceRef khảo sát"
+                }
+                val allowed=rule.optJSONArray("allowedVehicles")
+                val vehicles=if(allowed==null) emptySet() else {
+                    require(allowed.length() in 1..RoutingVehicle.entries.size)
+                    (0 until allowed.length()).map { ix ->
+                        RoutingVehicle.valueOf(allowed.getString(ix))
+                    }.toSet().also { require(it.isNotEmpty()) }
+                }
+                if(rule.has("allowedVehicles")) require(allowed!=null)
+                val blocked=rule.optJSONArray("blockedWindows")
+                if(rule.has("blockedWindows")) require(blocked!=null)
+                val windows=if(blocked==null) emptyList() else {
+                    require(blocked.length() in 1..32)
+                    (0 until blocked.length()).map { ix ->
+                        val w=blocked.getJSONObject(ix)
+                        val days=w.getJSONArray("days")
+                        require(days.length() in 1..7)
+                        val values=(0 until days.length()).map { days.getInt(it) }.toSet()
+                        SurveyClosure(values,w.getInt("startMinute"),w.getInt("endMinute"))
+                    }
+                }
+                require(vehicles.isNotEmpty() || windows.isNotEmpty()) {
+                    "Hạn chế giao thông phải có điều kiện hợp lệ"
+                }
+                return SurveyAccessRule(vehicles,windows,item.optString("sourceRef").trim())
+            }
             val graphNodes = (0 until points.length()).map { i ->
                 val item = points.getJSONObject(i)
                 val label=item.optString("displayName","").trim()
@@ -218,7 +251,7 @@ class RoadPackRepository(private val context: Context) {
                     "Đoạn routing đã duyệt cần sourceRef khảo sát"
                 }
                 RouteEdge(item.getString("id").trim(),start.id,end.id,road.id,metres,
-                    accepted && road.reviewed)
+                    accepted && road.reviewed,parseAccess(item))
             }
             val turns = (0 until approvedTurns.length()).map { i ->
                 val item = approvedTurns.getJSONObject(i)
@@ -227,7 +260,7 @@ class RoadPackRepository(private val context: Context) {
                     "Chuyển hướng đã duyệt cần sourceRef khảo sát"
                 }
                 AllowedTurn(item.getString("fromEdge"),item.getString("viaNode"),
-                    item.getString("toEdge"),accepted)
+                    item.getString("toEdge"),accepted,parseAccess(item))
             }
             OfflineRouteGraph(graphNodes,graphEdges,turns)
         }
