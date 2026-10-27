@@ -10,6 +10,7 @@ import android.net.Uri
 import com.thanhtaxi.smartdrive.data.RoadPackRepository
 import com.thanhtaxi.smartdrive.offline.OfflineAreaCatalog
 import com.thanhtaxi.smartdrive.offline.OfflineMapsActivity
+import com.thanhtaxi.smartdrive.offline.OfflinePoiActivity
 import com.thanhtaxi.smartdrive.offline.PmtilesManagerActivity
 import com.thanhtaxi.smartdrive.offline.MapStyleDefaults
 import com.thanhtaxi.smartdrive.navigation.RoutePreviewActivity
@@ -97,6 +98,10 @@ class SettingsActivity : Activity() {
         }
         action("Nhập và xem thử tệp PMTiles cục bộ (khi xe đỗ)") {
             openParkedTool(PmtilesManagerActivity::class.java)
+        }
+        heading("Tìm điểm đến offline (khi xe đỗ)")
+        action("Nhập gói POI SQLite và tìm địa chỉ không cần Internet") {
+            openParkedTool(OfflinePoiActivity::class.java)
         }
         heading("Dẫn đường offline — xem trước khi xe đỗ")
         action("Tính thử tuyến trên dữ liệu road pack đã nhập") {
