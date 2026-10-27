@@ -9,12 +9,18 @@ data class RouteNode(val id: String, val lat: Double, val lon: Double,
 data class RouteEdge(
     val id: String, val from: String, val to: String,
     val segmentId: String, val metres: Double, val reviewed: Boolean,
-    val access: SurveyAccessRule = SurveyAccessRule()
+    val access: SurveyAccessRule = SurveyAccessRule(),
+    /** User-supplied trip-model speed; NEVER a sign or legal speed. */
+    val assumedSpeedKph: Double? = null
 )
 data class AllowedTurn(val fromEdge: String, val viaNode: String, val toEdge: String,
                        val reviewed: Boolean, val access: SurveyAccessRule = SurveyAccessRule())
 data class RoutePlan(val nodeIds: List<String>, val edgeIds: List<String>, val metres: Double,
-                     val accessContext: RouteAccessContext? = null)
+                     val accessContext: RouteAccessContext? = null,
+                     val schedule: List<SegmentEta> = emptyList())
+
+data class SegmentEta(val edgeId: String, val enterEpochMs: Long,
+                      val exitEpochMs: Long, val modelSpeedKph: Double)
 
 /** No geometric intersection is treated as a junction unless it is explicitly in the graph. */
 class OfflineRouteGraph(
@@ -41,7 +47,9 @@ class OfflineRouteGraph(
         this.nodes = nodes.associateBy { it.id }
         require(edges.all { it.id.isNotBlank() && it.segmentId.isNotBlank() &&
             it.from in this.nodes && it.to in this.nodes && it.from != it.to &&
-            it.metres.isFinite() && it.metres in 2.0..3000.0 })
+            it.metres.isFinite() && it.metres in 2.0..3000.0 &&
+            (it.assumedSpeedKph==null || it.assumedSpeedKph.isFinite() &&
+                it.assumedSpeedKph in 5.0..110.0) })
         val edgeById = edges.associateBy { it.id }
         edgesById = edgeById
         require(turns.distinctBy { it.fromEdge to it.toEdge }.size==turns.size) {
@@ -88,6 +96,10 @@ class OfflineRouteGraph(
 
     fun isEdgeAllowed(id: String, context: RouteAccessContext? = null): Boolean =
         edgesById[id]?.let { it.reviewed && it.access.permits(context) }==true
+
+    fun hasLaneScopedRules(plan: RoutePlan): Boolean =
+        plan.edgeIds.any { edgesById[it]?.access?.laneScoped==true } ||
+        plan.edgeIds.zipWithNext().any { (a,b) -> rulesByTurn[a to b]?.laneScoped==true }
 
     fun hasConditionalRules(plan: RoutePlan): Boolean {
         if(plan.edgeIds.any { edgesById[it]?.access?.conditional==true }) return true

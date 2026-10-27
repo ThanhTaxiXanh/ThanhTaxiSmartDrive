@@ -10,16 +10,19 @@ enum class RoutingVehicle { TAXI, CAR, MOTORBIKE, BUS, TRUCK, OTHER }
 data class RouteAccessContext(
     val vehicle: RoutingVehicle,
     val dayOfWeek: Int,
-    val minuteOfDay: Int
+    val minuteOfDay: Int,
+    val lane: Int? = null
 ) {
     init {
-        require(dayOfWeek in 1..7 && minuteOfDay in 0..1439) { "Invalid day/time" }
+        require(dayOfWeek in 1..7 && minuteOfDay in 0..1439 &&
+            (lane==null || lane in 1..12)) { "Invalid day/time" }
     }
     companion object {
-        fun atVietnamTime(vehicle: RoutingVehicle, epochMillis: Long): RouteAccessContext {
+        fun atVietnamTime(vehicle: RoutingVehicle, epochMillis: Long,
+                              lane: Int? = null): RouteAccessContext {
             require(epochMillis >= 0)
             val t=Instant.ofEpochMilli(epochMillis).atZone(ZoneId.of("Asia/Ho_Chi_Minh"))
-            return RouteAccessContext(vehicle,t.dayOfWeek.value,t.hour*60+t.minute)
+            return RouteAccessContext(vehicle,t.dayOfWeek.value,t.hour*60+t.minute,lane)
         }
     }
 }
@@ -54,11 +57,14 @@ data class SurveyClosure(
 data class SurveyAccessRule(
     val allowedVehicles: Set<RoutingVehicle> = emptySet(),
     val closures: List<SurveyClosure> = emptyList(),
-    val sourceRef: String? = null
+    val sourceRef: String? = null,
+    val allowedLanes: Set<Int> = emptySet()
 ) {
-    val conditional: Boolean get() = allowedVehicles.isNotEmpty() || closures.isNotEmpty()
+    val laneScoped: Boolean get() = allowedLanes.isNotEmpty()
+    val conditional: Boolean get() = allowedVehicles.isNotEmpty() || closures.isNotEmpty() || laneScoped
     init {
         require(closures.size<=32)
+        require(allowedLanes.size<=12 && allowedLanes.all { it in 1..12 })
         require(!conditional || !sourceRef.isNullOrBlank()) {
             "Conditional survey rule requires sourceRef"
         }
@@ -68,6 +74,7 @@ data class SurveyAccessRule(
         if(!conditional) return true
         if(context==null) return false
         if(allowedVehicles.isNotEmpty() && context.vehicle !in allowedVehicles) return false
+        if(laneScoped && (context.lane==null || context.lane !in allowedLanes)) return false
         return closures.none { it.blocks(context) }
     }
 }
