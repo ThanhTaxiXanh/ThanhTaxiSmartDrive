@@ -44,7 +44,7 @@ object RoutePreviewInstructions {
             require(e.reviewed && e.from==plan.nodeIds[i] && e.to==plan.nodeIds[i+1]) {
                 "Route edge is not reviewed or does not connect the claimed nodes"
             }
-            if (i>0) require(graph.isValidatedSegmentTransition(edges[i-1].segmentId,e.segmentId)) {
+            if (i>0) require(graph.hasReviewedTurn(edges[i-1].id,e.id)) {
                 "No reviewed connection between surveyed segments"
             }
         }

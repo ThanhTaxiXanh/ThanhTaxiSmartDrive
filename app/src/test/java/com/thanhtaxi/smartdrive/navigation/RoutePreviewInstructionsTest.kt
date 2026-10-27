@@ -35,6 +35,16 @@ class RoutePreviewInstructionsTest {
         try { RoutePreviewInstructions.generate(without,forged);fail("should reject unreviewed turn") }
         catch (_:IllegalArgumentException) {}
     }
+    @Test fun forgedTurnCannotPassEvenWhenBothEdgesAreSameSegment() {
+        val sameSegment=OfflineRouteGraph(nodes,listOf(
+            RouteEdge("ab","A","B","same",111.0,true),
+            RouteEdge("br","B","R","same",104.0,true)),emptyList())
+        val forged=RoutePlan(listOf("A","B","R"),listOf("ab","br"),215.0)
+        try {
+            RoutePreviewInstructions.generate(sameSegment,forged)
+            fail("Explicit edge-to-edge turn must exist")
+        } catch (_: IllegalArgumentException) {}
+    }
     @Test fun malformedPlanIsRefused() {
         val plan=RoutePlan(listOf("R","B","A"),listOf("br","ab"),215.0)
         try { RoutePreviewInstructions.generate(graph,plan);fail("wrong edge direction") }

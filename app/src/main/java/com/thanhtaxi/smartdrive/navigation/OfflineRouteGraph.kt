@@ -64,6 +64,8 @@ class OfflineRouteGraph(
 
     /** Returns the surveyed directed edge for route-preview generation only. */
     fun edge(id: String): RouteEdge? = edgesById[id]
+    fun hasReviewedTurn(previousEdge: String, nextEdge: String): Boolean =
+        (previousEdge to nextEdge) in allowed
 
     /**
      * Dijkstra over (node, preceding directed edge). Every intermediate turn

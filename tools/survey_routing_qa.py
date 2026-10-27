@@ -47,8 +47,9 @@ def inspect_routing(routing, roads, add):
             continue
         es[ident]=e
         a,b=e.get("fromNode"),e.get("toNode")
-        segment=roads.get(e.get("segmentId"))
-        if a not in ns or b not in ns or a==b:
+        segmentId=e.get("segmentId")
+        segment=roads.get(segmentId) if isinstance(segmentId,str) else None
+        if not isinstance(a,str) or not isinstance(b,str) or a not in ns or b not in ns or a==b:
             add("error",ident,"Directed edge has nonexistent or identical endpoints")
         if segment is None:
             add("error",ident,"Directed edge references unknown surveyed road")
@@ -59,7 +60,7 @@ def inspect_routing(routing, roads, add):
                 add("error",ident,"Reviewed edge lacks a survey sourceRef")
             if segment is not None and segment.get("reviewed") is not True:
                 add("error",ident,"Reviewed routing edge uses an unreviewed segment")
-        if a in ns and b in ns and segment is not None and e.get("direction") in ("forward","reverse"):
+        if isinstance(a,str) and isinstance(b,str) and a in ns and b in ns and segment is not None and e.get("direction") in ("forward","reverse"):
             try:
                 beginning=segment["from"] if e["direction"]=="forward" else segment["to"]
                 ending=segment["to"] if e["direction"]=="forward" else segment["from"]
@@ -83,8 +84,9 @@ def inspect_routing(routing, roads, add):
         if ident in seen:
             add("error","turn","Duplicate directed turn")
         seen.add(ident)
-        before=es.get(src);after=es.get(dst)
-        if before is None or after is None or via not in ns or (
+        before=es.get(src) if isinstance(src,str) else None
+        after=es.get(dst) if isinstance(dst,str) else None
+        if before is None or after is None or not isinstance(via,str) or via not in ns or (
             before is not None and after is not None and
             (before.get("toNode")!=via or after.get("fromNode")!=via)):
             add("error","turn","Turn cannot traverse through specified shared node")

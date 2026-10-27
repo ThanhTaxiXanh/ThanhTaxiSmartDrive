@@ -42,6 +42,13 @@ class SurveyRoutingQaTests(unittest.TestCase):
         g,r=sample()
         g["edges"][0]["direction"]="reverse"
         self.assertTrue(errors(g,r))
+    def test_malformed_values_report_errors_instead_of_crashing(self):
+        g,r=sample()
+        g["edges"][0]["fromNode"]=["bad","value"]
+        self.assertTrue(errors(g,r))
+        g,r=sample()
+        g["allowedTurns"][0]["fromEdge"]=["bad"]
+        self.assertTrue(errors(g,r))
     def test_self_reported_turn_with_unreviewed_edge_rejected(self):
         g,r=sample()
         g["edges"][0]["reviewed"]=False
