@@ -21,11 +21,13 @@ import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
 import android.widget.*
-import com.thanhtaxi.smartdrive.data.RoadMatcher
+import com.thanhtaxi.smartdrive.data.RoadPack
 import com.thanhtaxi.smartdrive.data.RoadPackRepository
 import com.thanhtaxi.smartdrive.domain.*
 import com.thanhtaxi.smartdrive.media.MediaAccessService
 import org.maplibre.android.MapLibre
+import org.maplibre.android.annotations.Marker
+import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
@@ -54,7 +56,12 @@ class MainActivity : Activity(), LocationListener {
     private val handler = Handler(Looper.getMainLooper())
     private val engine = SpeedLimitEngine()
     private val compliance = SpeedCompliance()
-    private val matcher = RoadMatcher()
+    private val matcher = GeoMatcher()
+    private val signEngine = TrafficSignEngine()
+    private var roadPack: RoadPack? = null
+    private var roadLines: List<RoadLine> = emptyList()
+    private val signMarkers = mutableListOf<Marker>()
+    private var lastMarkerLocation: Location? = null
     private var mediaController: MediaController? = null
     private val prefs by lazy { getSharedPreferences("taxi", MODE_PRIVATE) }
     private val locationManager by lazy { getSystemService(LOCATION_SERVICE) as LocationManager }
@@ -65,7 +72,6 @@ class MainActivity : Activity(), LocationListener {
         super.onCreate(savedInstanceState)
         MapLibre.getInstance(this)
         buildDashboard(savedInstanceState)
-        requestGps()
     }
     private fun cardBackground(): GradientDrawable = GradientDrawable().apply {
         setColor(Color.rgb(26, 31, 39)); cornerRadius = 14f
@@ -86,7 +92,10 @@ class MainActivity : Activity(), LocationListener {
         mapView.onCreate(state)
         mapView.getMapAsync { m ->
             map = m
-            m.setStyle(prefs.getString("style", "https://demotiles.maplibre.org/style.json")!!)
+            m.setStyle(prefs.getString("style", "https://demotiles.maplibre.org/style.json")!!) {
+                lastMarkerLocation = null
+                renderNearbySigns(lastLocation)
+            }
             m.cameraPosition = CameraPosition.Builder().target(LatLng(21.033, 105.85)).zoom(12.0).build()
             lastLocation?.let { follow(it) }
         }
@@ -106,6 +115,19 @@ class MainActivity : Activity(), LocationListener {
         gpsLabel = label("Đang chờ tín hiệu GPS", 14f); info.addView(gpsLabel)
         signLabel = label("Giới hạn: Chưa xác minh", 13f); info.addView(signLabel)
         mapPane.addView(info, FrameLayout.LayoutParams(-2,-2, Gravity.TOP or Gravity.START))
+        if (landscape) {
+            val settings = Button(this).apply {
+                text = "⚙"
+                contentDescription = "Cài đặt khi xe đã đỗ"
+                setOnClickListener {
+                    if (isStopped()) startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
+                    else Toast.makeText(this@MainActivity, "Chỉ cài đặt khi xe dừng", Toast.LENGTH_SHORT).show()
+                }
+            }
+            val width = (68 * resources.displayMetrics.density).toInt()
+            val height = (55 * resources.displayMetrics.density).toInt()
+            mapPane.addView(settings, FrameLayout.LayoutParams(width,height,Gravity.TOP or Gravity.RIGHT))
+        }
         val right = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val calendarCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; background = cardBackground(); setPadding(6,6,6,6)
@@ -162,8 +184,9 @@ class MainActivity : Activity(), LocationListener {
         setContentView(root)
     }
     private fun isStopped(): Boolean {
-        val loc = lastLocation ?: return true
-        return !loc.hasSpeed() || loc.speed < 0.8f
+        val loc = lastLocation ?: return false
+        return SystemClock.elapsedRealtime() - lastFixElapsedMs < 5000L &&
+            loc.hasAccuracy() && loc.accuracy <= 15f && loc.hasSpeed() && loc.speed < 0.8f
     }
     private fun requestGps() {
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -183,6 +206,7 @@ class MainActivity : Activity(), LocationListener {
         lastLocation = location
         lastFixElapsedMs = SystemClock.elapsedRealtime()
         follow(location)
+        renderNearbySigns(location)
         refreshData()
     }
     private fun follow(location: Location) {
@@ -198,17 +222,35 @@ class MainActivity : Activity(), LocationListener {
         val speedReliable = accurate && loc != null && loc.hasSpeed() &&
             (!loc.hasSpeedAccuracy() || loc.speedAccuracyMetersPerSecond <= 2.5f)
         val speed = if (speedReliable && loc != null) loc.speed.toDouble() * 3.6 else null
-        val pack = RoadPackRepository(this).load()
-        val segment = if (accurate && loc != null && pack != null) matcher.match(loc, pack.segments) else null
-        val context = RoadContext(segment?.id, segment?.direction, null,
+        val pack = roadPack
+        val match = if (accurate && loc != null && pack != null) matcher.match(
+            GeoFix(loc.latitude, loc.longitude, loc.accuracy.toDouble(),
+                if (loc.hasBearing()) loc.bearing.toDouble() else null,
+                if (loc.hasSpeed()) loc.speed.toDouble() else null),
+            roadLines
+        ) else null
+        val segment = pack?.segments?.firstOrNull { it.id == match?.segmentId }
+        val baseContext = RoadContext(segment?.id, segment?.direction, null,
             segment?.zone ?: PopulationZone.UNKNOWN, segment?.kind ?: RoadKind.UNKNOWN,
-            matchedConfidently = segment != null, gpsReliable = accurate)
-        val limit = engine.resolve(context, pack?.signs.orEmpty(), System.currentTimeMillis())
+            matchedConfidently = match != null && segment != null, gpsReliable = accurate)
+        val now = System.currentTimeMillis()
+        val decision = signEngine.evaluate(baseContext, match?.progressMeters ?: 0.0,
+            loc?.accuracy?.toDouble() ?: 100.0, pack?.trafficSigns.orEmpty(), now)
+        val context = baseContext.copy(zone = decision.zone)
+        val limit = if (decision.conflict)
+            LimitResult(null, LimitStatus.CONFLICT, "traffic-signs", "Biển báo cùng vị trí mâu thuẫn")
+        else engine.resolve(context, pack?.signs.orEmpty() + listOfNotNull(decision.speedEvidence), now)
         val level = compliance.grade(SpeedObservation(speed, speedReliable), limit, prefs.getInt("tolerance",3))
         speedLabel.text = if (speed == null) "-- km/h" else "${speed.toInt()} km/h"
         limitLabel.text = "GH: ${limit.kph?.toString() ?: "--"}"
-        signLabel.text = if (limit.kph == null) "Giới hạn: Chưa xác minh (${limit.note})"
-            else "${limit.status.name}: ${limit.note}"
+        val next = decision.upcoming.joinToString(" • ") {
+            val code = when(it.kind) { SignKind.R_420 -> "R.420"; SignKind.R_421 -> "R.421";
+                SignKind.P_127 -> "P.127 ${it.kph ?: "--"}"; SignKind.END_SPEED -> "Hết hạn chế" }
+            "${it.metres}m: $code"
+        }
+        signLabel.text = (if (limit.kph == null) "Giới hạn: -- (${limit.note})"
+            else "${limit.status.name}: ${limit.note}") +
+            if (next.isNotBlank()) "\nSắp tới: $next" else ""
         gpsLabel.text = when {
             !fresh -> "Mất GPS / tín hiệu cũ"
             !accurate -> "GPS yếu: ${loc?.accuracy?.toInt()}m"
@@ -219,6 +261,37 @@ class MainActivity : Activity(), LocationListener {
             Color.RED else Color.rgb(255, 208, 66))
         refreshMedia()
         refreshQr()
+    }
+    private fun renderNearbySigns(loc: Location?) {
+        val m = map ?: return
+        if (loc == null) return
+        val previous = lastMarkerLocation
+        if (previous != null && previous.distanceTo(loc) < 120f) return
+        if (m.style == null) return
+        m.removeAnnotations(signMarkers)
+        signMarkers.clear()
+        val nearby = roadPack?.trafficSigns.orEmpty().asSequence()
+            .filter { it.reviewed && it.confidence >= 0.9 &&
+                kotlin.math.abs(it.latitude - loc.latitude) < 0.015 &&
+                kotlin.math.abs(it.longitude - loc.longitude) < 0.020 }
+            .mapNotNull { sign ->
+                val d = FloatArray(1)
+                Location.distanceBetween(loc.latitude, loc.longitude, sign.latitude, sign.longitude, d)
+                if (d[0] <= 800f) sign to d[0] else null
+            }.sortedBy { it.second }.take(25).toList()
+        nearby.forEach { (sign, _) ->
+            val title = when(sign.kind) {
+                SignKind.R_420 -> "R.420 – Bắt đầu khu đông dân cư"
+                SignKind.R_421 -> "R.421 – Hết khu đông dân cư"
+                SignKind.P_127 -> "P.127 – Giới hạn ${sign.kph} km/h"
+                SignKind.END_SPEED -> "Kết thúc hạn chế (đã khảo sát)"
+            }
+            signMarkers.add(m.addMarker(MarkerOptions()
+                .position(LatLng(sign.latitude,sign.longitude))
+                .title(title)
+                .snippet("Nguồn: gói khảo sát người dùng; cần kiểm chứng tại hiện trường")))
+        }
+        lastMarkerLocation = Location(loc)
     }
     private fun refreshQr() {
         val uri = prefs.getString("paymentImage", null)
@@ -242,7 +315,13 @@ class MainActivity : Activity(), LocationListener {
     }
     override fun onResume() {
         super.onResume(); mapView.onResume()
-        startGps(); handler.removeCallbacks(tick); handler.post(tick)
+        roadPack = RoadPackRepository(this).load()
+        roadLines = roadPack?.segments.orEmpty().map {
+            RoadLine(it.id,it.startLat,it.startLon,it.endLat,it.endLon,it.reviewed)
+        }
+        lastMarkerLocation = null
+        renderNearbySigns(lastLocation)
+        requestGps(); handler.removeCallbacks(tick); handler.post(tick)
     }
     override fun onStart() { super.onStart(); mapView.onStart() }
     override fun onPause() {
@@ -250,7 +329,12 @@ class MainActivity : Activity(), LocationListener {
         mapView.onPause(); super.onPause()
     }
     override fun onStop() { mapView.onStop(); super.onStop() }
-    override fun onDestroy() { mapView.onDestroy(); super.onDestroy() }
+    override fun onDestroy() {
+        map?.removeAnnotations(signMarkers)
+        signMarkers.clear()
+        mapView.onDestroy()
+        super.onDestroy()
+    }
     override fun onLowMemory() { super.onLowMemory(); mapView.onLowMemory() }
     override fun onSaveInstanceState(outState: Bundle) { mapView.onSaveInstanceState(outState); super.onSaveInstanceState(outState) }
 }
