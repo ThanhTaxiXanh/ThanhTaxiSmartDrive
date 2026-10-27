@@ -311,6 +311,39 @@ class OfflineRouteGraph(
         return kotlin.math.abs(total-plan.metres)<0.25
     }
 
+    /**
+     * Re-forecasts the still-untraversed portion from CURRENT GPS time. A
+     * scheduled closure that begins during an edge or at a later junction
+     * suspends the prototype instead of promising access.
+     */
+    fun remainingSchedulePermits(plan:RoutePlan,edgeIndex:Int,
+                                 alreadyTravelledOnEdge:Double,
+                                 nowEpochMs:Long):Boolean {
+        if(!isScheduledPlanValid(plan) || nowEpochMs<0 ||
+            edgeIndex !in plan.edgeIds.indices ||
+            !alreadyTravelledOnEdge.isFinite())return false
+        val context=plan.accessContext?:return false
+        var time=nowEpochMs
+        for(i in edgeIndex until plan.edgeIds.size) {
+            val e=edgesById[plan.edgeIds[i]]?:return false
+            val speed=plan.schedule[i].modelSpeedKph
+            val remaining=if(i==edgeIndex) e.metres-alreadyTravelledOnEdge else e.metres
+            if(remaining < -5.0 || remaining>e.metres+1.0)return false
+            val travelMs=kotlin.math.ceil(remaining.coerceAtLeast(0.0)*3600.0/
+                speed).toLong().coerceAtLeast(1L)
+            if(time>Long.MAX_VALUE-travelMs)return false
+            val exit=time+travelMs
+            if(exit-nowEpochMs>12L*60*60*1000)return false
+            if(i>edgeIndex && !hasReviewedTurn(plan.edgeIds[i-1],e.id,
+                RouteAccessContext.atVietnamTime(context.vehicle,time,context.lane)))
+                return false
+            if(!isEdgeAvailableDuring(e.id,context.vehicle,context.lane,time,exit))
+                return false
+            time=exit
+        }
+        return true
+    }
+
     private fun isRouteEligibleGeometry(plan:RoutePlan):Boolean {
         if(plan.nodeIds.size!=plan.edgeIds.size+1)return false
         return plan.edgeIds.indices.all { i ->
