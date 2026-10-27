@@ -111,3 +111,15 @@ off, requires an installed offline Vietnamese voice and only describes the
 geometry of surveyed route changes; never implies permission to turn.
 Unit and Emulator tests cover these components. See
 [ETA-VOICE-TESTING.md](ETA-VOICE-TESTING.md).
+
+## Surveyed road restrictions and Vietnamese point lookup
+
+Restricted graph edges/turns now support a TAXI/vehicle filter and weekday
+closures, with conservative unknown-context and changing-window handling.
+Vietnamese point names in imported `routing.nodes[].displayName` can be
+searched without diacritics. See
+[ROUTING-RESTRICTIONS.md](ROUTING-RESTRICTIONS.md).
+
+**Still not real traffic-rule certification:** no verified per-vehicle sign
+inventory, lane rules, arrival-time-aware road access, 3D bridge/junction
+model or national geocoding.

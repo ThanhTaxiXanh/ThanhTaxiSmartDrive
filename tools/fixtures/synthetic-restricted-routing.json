@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "series": "synthetic-constraints-demo",
+  "version": 1,
+  "title": "DEMO KỸ THUẬT - ĐƯỜNG GIẢ LẬP, KHÔNG PHẢI ĐƯỜNG THỰC",
+  "source": "SYNTHETIC GEOMETRY: generated for automated QA; not road authority or OSM extract",
+  "license": "Synthetic test fixture only; no roadway or traffic legality assertions",
+  "segments": [
+    {
+      "id": "ab",
+      "from": [
+        21,
+        106
+      ],
+      "to": [
+        21,
+        106.001
+      ],
+      "roadKind": "TWO_WAY_OR_SINGLE_LANE_ONEWAY",
+      "populationZone": "UNKNOWN",
+      "direction": "forward",
+      "reviewed": true,
+      "sourceRef": "TEST-NOT-LEGAL"
+    },
+    {
+      "id": "bc",
+      "from": [
+        21,
+        106.001
+      ],
+      "to": [
+        21,
+        106.002
+      ],
+      "roadKind": "TWO_WAY_OR_SINGLE_LANE_ONEWAY",
+      "populationZone": "UNKNOWN",
+      "direction": "forward",
+      "reviewed": true,
+      "sourceRef": "TEST-NOT-LEGAL"
+    },
+    {
+      "id": "ad",
+      "from": [
+        21,
+        106
+      ],
+      "to": [
+        21.001,
+        106.001
+      ],
+      "roadKind": "TWO_WAY_OR_SINGLE_LANE_ONEWAY",
+      "populationZone": "UNKNOWN",
+      "direction": "forward",
+      "reviewed": true,
+      "sourceRef": "TEST-NOT-LEGAL"
+    },
+    {
+      "id": "dc",
+      "from": [
+        21.001,
+        106.001
+      ],
+      "to": [
+        21,
+        106.002
+      ],
+      "roadKind": "TWO_WAY_OR_SINGLE_LANE_ONEWAY",
+      "populationZone": "UNKNOWN",
+      "direction": "forward",
+      "reviewed": true,
+      "sourceRef": "TEST-NOT-LEGAL"
+    }
+  ],
+  "speedSigns": [],
+  "trafficSigns": [],
+  "routing": {
+    "nodes": [
+      {
+        "id": "A",
+        "lat": 21,
+        "lon": 106,
+        "displayName": "Điểm A (giả lập)"
+      },
+      {
+        "id": "B",
+        "lat": 21,
+        "lon": 106.001,
+        "displayName": "Điểm B (giả lập)"
+      },
+      {
+        "id": "C",
+        "lat": 21,
+        "lon": 106.002,
+        "displayName": "Điểm C (giả lập)"
+      },
+      {
+        "id": "D",
+        "lat": 21.001,
+        "lon": 106.001,
+        "displayName": "Điểm D (giả lập)"
+      }
+    ],
+    "edges": [
+      {
+        "id": "ab",
+        "fromNode": "A",
+        "toNode": "B",
+        "segmentId": "ab",
+        "direction": "forward",
+        "distanceMeters": 104,
+        "reviewed": true,
+        "sourceRef": "TEST-EDGE"
+      },
+      {
+        "id": "bc",
+        "fromNode": "B",
+        "toNode": "C",
+        "segmentId": "bc",
+        "direction": "forward",
+        "distanceMeters": 104,
+        "reviewed": true,
+        "sourceRef": "TEST-EDGE",
+        "restrictions": {
+          "allowedVehicles": [
+            "TAXI"
+          ],
+          "blockedWindows": [
+            {
+              "days": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "startMinute": 420,
+              "endMinute": 540
+            }
+          ]
+        }
+      },
+      {
+        "id": "ad",
+        "fromNode": "A",
+        "toNode": "D",
+        "segmentId": "ad",
+        "direction": "forward",
+        "distanceMeters": 150,
+        "reviewed": true,
+        "sourceRef": "TEST-EDGE"
+      },
+      {
+        "id": "dc",
+        "fromNode": "D",
+        "toNode": "C",
+        "segmentId": "dc",
+        "direction": "forward",
+        "distanceMeters": 150,
+        "reviewed": true,
+        "sourceRef": "TEST-EDGE"
+      }
+    ],
+    "allowedTurns": [
+      {
+        "fromEdge": "ab",
+        "viaNode": "B",
+        "toEdge": "bc",
+        "reviewed": true,
+        "sourceRef": "TEST-TURN",
+        "restrictions": {
+          "allowedVehicles": [
+            "TAXI"
+          ]
+        }
+      },
+      {
+        "fromEdge": "ad",
+        "viaNode": "D",
+        "toEdge": "dc",
+        "reviewed": true,
+        "sourceRef": "TEST-TURN"
+      }
+    ]
+  }
+}

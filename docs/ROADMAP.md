@@ -115,3 +115,14 @@ See [active navigation pilot](phase2/ACTIVE-NAVIGATION.md).
 - [ ] Audible Vietnamese TTS confirmation on devices with installed local voices (deferred)
 
 Details: [Phase 2 ETA/voice](phase2/ETA-VOICE-TESTING.md).
+
+### Phase 2 surveyed restricted routing (2026-10-27)
+
+- [x] Directed-graph optional vehicle and ISO weekday/minute closure restrictions
+- [x] Fail-closed missing context, overnight rules and live expiry suspension
+- [x] Vietnamese accent-insensitive **imported survey-point** search
+- [x] Python structural QA, Kotlin rule tests and Android Emulator JSON parser tests
+- [ ] Licensed official traffic restrictions, lane/junction applicability, arrival-time validation
+- [ ] National address search; field verification (physical trials deferred)
+
+Document: [Routing restrictions](phase2/ROUTING-RESTRICTIONS.md).

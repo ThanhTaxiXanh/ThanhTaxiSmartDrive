@@ -97,3 +97,17 @@ chuyển sang tile Internet. Thành công tải style **chưa chứng minh tile
 Dữ liệu thực địa/Bắc Giang–Bắc Ninh chưa được phát hành dưới dạng đồ
 thị tuyến đáng tin cậy, do vậy chức năng chỉ dùng để kiểm thử bộ dữ liệu
 do người dùng nhập khi xe đỗ.
+
+## Hạn chế giờ, loại phương tiện và tìm tên không dấu (alpha)
+
+Đồ thị nay hỗ trợ `restrictions.allowedVehicles` và
+`restrictions.blockedWindows` cho **cạnh đường** và từng **lượt rẽ
+có hướng**. Dữ liệu chỉ được tự khai bởi người nhập; `reviewed` không
+có nghĩa là được cơ quan có thẩm quyền xác minh. Thiếu thông tin ngày/giờ
+hoặc xe ở quy tắc có điều kiện thì lọc bỏ tuyến khảo sát đó. Khi điều kiện
+giờ thay đổi trong phiên GPS, tạm ngưng hướng dẫn thay vì suy luận quyền đi.
+
+Tìm kiếm tên điểm `displayName` trong road pack hỗ trợ không dấu,
+không làm thay chức năng tìm địa chỉ toàn quốc.
+
+Định dạng và file demo: [Hạn chế định tuyến Phase 2](phase2/ROUTING-RESTRICTIONS.md).

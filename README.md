@@ -203,3 +203,15 @@ offline, app không đọc tiếng và không tự chuyển sang TTS qua mạng.
 Giọng nói chỉ mô tả hình học thử nghiệm, không ra lệnh rẽ hợp pháp.
 
 Chi tiết: [ETA & giọng nói](docs/phase2/ETA-VOICE-TESTING.md).
+
+## Phase 2 — Lọc hạn chế loại xe và giờ (đồ thị thử nghiệm)
+
+Road pack có thể khai báo `routing.edges[].restrictions` hoặc
+`routing.allowedTurns[].restrictions` để lọc theo loại xe
+`TAXI/CAR/MOTORBIKE/BUS/TRUCK/OTHER` và khung giờ Việt Nam.
+Nếu thiếu ngữ cảnh, bộ giải từ chối cạnh/lượt rẽ có điều kiện;
+nếu giờ cấm thay đổi trong khi theo tuyến, app tạm ẩn hướng dẫn.
+Tìm tên điểm khảo sát cũng đã hỗ trợ bỏ dấu tiếng Việt.
+
+Toàn bộ dữ liệu hạn chế do người dùng tự khai **chưa được xác minh pháp lý**.
+[Chi tiết và gói kiểm thử giả lập](docs/phase2/ROUTING-RESTRICTIONS.md).
