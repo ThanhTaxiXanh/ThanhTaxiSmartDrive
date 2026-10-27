@@ -303,8 +303,14 @@ class MainActivity : Activity(), LocationListener {
                 SignKind.P_127 -> "P.127 ${it.kph ?: "--"}"; SignKind.END_SPEED -> "Hết hạn chế" }
             "${it.metres}m: $code"
         }
-        signLabel.text = (if (limit.kph == null) "Giới hạn: -- (${limit.note})"
-            else "${limit.status.name}: ${limit.note}") +
+        val evidenceLabel = when (limit.status) {
+            LimitStatus.VERIFIED -> "Theo gói khảo sát (CHƯA kiểm chứng độc lập)"
+            LimitStatus.ESTIMATED_FROM_LAW -> "Ước tính mặc định; xem biển thực tế"
+            LimitStatus.CONFLICT -> "Dữ liệu mâu thuẫn, không được suy đoán"
+            LimitStatus.UNKNOWN -> "Chưa đủ cơ sở xác định"
+        }
+        signLabel.text = (if (limit.kph == null) "Giới hạn: -- ($evidenceLabel)"
+            else "$evidenceLabel: ${limit.note}") +
             if (next.isNotBlank()) "\nSắp tới: $next" else ""
         gpsLabel.text = when {
             !fresh -> "Mất GPS / tín hiệu cũ"
