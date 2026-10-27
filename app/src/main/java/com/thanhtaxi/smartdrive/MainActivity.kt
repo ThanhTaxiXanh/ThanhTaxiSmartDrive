@@ -70,6 +70,7 @@ class MainActivity : Activity(), LocationListener {
     private val signEngine = TrafficSignEngine()
     private var roadPack: RoadPack? = null
     private var roadLines: List<RoadLine> = emptyList()
+    private var roadIndex = RoadSpatialIndex(emptyList())
     private val signMarkers = mutableListOf<Marker>()
     private var vehicleMarker: Marker? = null
     private var vehicleIcon: Icon? = null
@@ -280,7 +281,7 @@ class MainActivity : Activity(), LocationListener {
             GeoFix(loc.latitude, loc.longitude, loc.accuracy.toDouble(),
                 if (loc.hasBearing()) loc.bearing.toDouble() else null,
                 if (loc.hasSpeed()) loc.speed.toDouble() else null),
-            roadLines
+            roadIndex
         ) else null
         val segment = pack?.segments?.firstOrNull { it.id == match?.segmentId }
         val baseContext = RoadContext(segment?.id, segment?.direction, null,
@@ -392,6 +393,7 @@ class MainActivity : Activity(), LocationListener {
         roadLines = roadPack?.segments.orEmpty().map {
             RoadLine(it.id,it.startLat,it.startLon,it.endLat,it.endLon,it.reviewed)
         }
+        roadIndex = RoadSpatialIndex(roadLines)
         lastMarkerLocation = null
         renderNearbySigns(lastLocation)
         requestGps(); handler.removeCallbacks(tick); handler.post(tick)

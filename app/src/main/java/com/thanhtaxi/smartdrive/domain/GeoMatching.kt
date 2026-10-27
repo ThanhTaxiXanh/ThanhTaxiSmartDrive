@@ -41,7 +41,40 @@ object GeoMath {
  * Rejects parallel-road / crossing-road ties rather than guessing. A road pack
  * must contain directional, topologically split, surveyed segments.
  */
+/** Immutable grid index for short validated road segments; avoids scanning nationwide packs every GPS tick. */
+class RoadSpatialIndex(roads: List<RoadLine>, private val cellSizeDegrees: Double = 0.002) {
+    private val grid: Map<Pair<Int,Int>, List<RoadLine>>
+    init {
+        require(cellSizeDegrees > 0 && cellSizeDegrees <= 0.01)
+        val cells = mutableMapOf<Pair<Int,Int>, MutableList<RoadLine>>()
+        for (r in roads) {
+            if (!r.reviewed) continue
+            val yMin = cell(min(r.aLat,r.bLat)); val yMax = cell(max(r.aLat,r.bLat))
+            val xMin = cell(min(r.aLon,r.bLon)); val xMax = cell(max(r.aLon,r.bLon))
+            // Refuse pathological or unvalidated country-spanning polylines.
+            if ((yMax-yMin+1)*(xMax-xMin+1) > 500) continue
+            for (y in yMin..yMax) for (x in xMin..xMax) {
+                cells.getOrPut(y to x) { mutableListOf() }.add(r)
+            }
+        }
+        grid = cells
+    }
+    private fun cell(degrees: Double): Int = floor(degrees / cellSizeDegrees).toInt()
+    fun query(lat: Double, lon: Double): List<RoadLine> {
+        if (lat !in -90.0..90.0 || lon !in -180.0..180.0 || !lat.isFinite() || !lon.isFinite()) return emptyList()
+        val y=cell(lat);val x=cell(lon)
+        return (-1..1).asSequence().flatMap { dy ->
+            (-1..1).asSequence().flatMap { dx ->
+                grid[y+dy to x+dx].orEmpty().asSequence()
+            }
+        }.distinctBy { it.id }.toList()
+    }
+}
+
 class GeoMatcher {
+    fun match(fix: GeoFix, index: RoadSpatialIndex): RoadMatch? =
+        match(fix, index.query(fix.latitude, fix.longitude))
+
     fun match(fix: GeoFix, segments: List<RoadLine>): RoadMatch? {
         if (!fix.latitude.isFinite() || !fix.longitude.isFinite() ||
             fix.latitude !in -90.0..90.0 || fix.longitude !in -180.0..180.0 ||
