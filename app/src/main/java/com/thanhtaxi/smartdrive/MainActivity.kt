@@ -161,7 +161,7 @@ class MainActivity : Activity(), LocationListener {
                 text = "⚙"
                 contentDescription = "Cài đặt khi xe đã đỗ"
                 setOnClickListener {
-                    if (isStopped()) startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
+                    if (isStopped()) startActivity(Intent(this@MainActivity, SettingsActivity::class.java).putExtra("verifiedStopped", true))
                     else Toast.makeText(this@MainActivity, "Chỉ cài đặt khi xe dừng", Toast.LENGTH_SHORT).show()
                 }
             }

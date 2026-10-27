@@ -7,6 +7,7 @@ import android.provider.Settings
 import android.widget.*
 import android.net.Uri
 import com.thanhtaxi.smartdrive.data.RoadPackRepository
+import com.thanhtaxi.smartdrive.offline.OfflineMapsActivity
 
 class SettingsActivity : Activity() {
     companion object { private const val PHOTO = 102; private const val PACK = 103 }
@@ -39,6 +40,12 @@ class SettingsActivity : Activity() {
                 prefs.edit().putString("style", url).apply()
                 Toast.makeText(this, "Đã lưu. Mở lại dashboard để áp dụng", Toast.LENGTH_SHORT).show()
             } else Toast.makeText(this, "Cần URL HTTPS", Toast.LENGTH_SHORT).show()
+        }
+        heading("Bản đồ offline (khi xe đã đỗ)")
+        action("Quản lý vùng tải offline Bắc Giang / Bắc Ninh") {
+            val parked = intent.getBooleanExtra("verifiedStopped", false)
+            if (!parked) Toast.makeText(this,"Chỉ tải hoặc sửa gói khi xe dừng, vào từ Dashboard",Toast.LENGTH_LONG).show()
+            else startActivity(Intent(this, OfflineMapsActivity::class.java).putExtra("verifiedStopped", true))
         }
         heading("Cảnh báo tốc độ")
         val tolerance = SeekBar(this).apply { max = 10; progress = prefs.getInt("tolerance", 3) }
