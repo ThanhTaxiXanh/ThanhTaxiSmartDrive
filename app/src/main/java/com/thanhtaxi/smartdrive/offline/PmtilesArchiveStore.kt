@@ -14,7 +14,8 @@ data class PmtilesArchive(
     val sha256: String,
     val sourceName: String,
     val license: String,
-    val attribution: String
+    val attribution: String,
+    val vectorInfo: PmtilesVectorInfo? = null
 ) {
     val tileUri: String get() = "pmtiles://file://" + file.absolutePath
 }
@@ -107,7 +108,12 @@ class PmtilesArchiveStore(private val context: Context) {
                 .toString()
             check(prefs.edit().putString("active",manifest).commit()) { "Could not save archive metadata" }
             // Replacing an archive never silently deletes the previous file.
-            return PmtilesArchive(target,header,hash,source,terms,credit)
+            val vectorInfo = if(header.tileType == 1) runCatching {
+                PmtilesVectorMetadata.read(target)
+            }.getOrElse {
+                PmtilesVectorInfo(emptyList(),it.message ?: "Cannot inspect vector metadata")
+            } else null
+            return PmtilesArchive(target,header,hash,source,terms,credit,vectorInfo)
         } finally {
             temp.delete()
         }
@@ -121,9 +127,15 @@ class PmtilesArchiveStore(private val context: Context) {
         val file = File(folder,"$hash.pmtiles")
         if (!file.isFile || file.length() != manifest.getLong("bytes")) return null
         if (digestOf(file) != hash) return null
-        PmtilesArchive(file,parse(file),hash,
+        val h = parse(file)
+        val vectorInfo = if (h.tileType == 1) runCatching {
+            PmtilesVectorMetadata.read(file)
+        }.getOrElse {
+            PmtilesVectorInfo(emptyList(),it.message ?: "Cannot inspect vector metadata")
+        } else null
+        PmtilesArchive(file,h,hash,
             manifest.getString("source"),manifest.getString("license"),
-            manifest.getString("attribution"))
+            manifest.getString("attribution"),vectorInfo)
     }.getOrNull()
 
     @Synchronized fun deleteActiveArchive(): Boolean {

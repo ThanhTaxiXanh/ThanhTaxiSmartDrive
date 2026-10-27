@@ -35,6 +35,7 @@ import com.thanhtaxi.smartdrive.offline.MapStyleDefaults
 import com.thanhtaxi.smartdrive.offline.PmtilesArchiveStore
 import com.thanhtaxi.smartdrive.offline.PmtilesHeader
 import com.thanhtaxi.smartdrive.offline.PmtilesRasterStyle
+import com.thanhtaxi.smartdrive.offline.PmtilesVectorStyle
 import org.maplibre.android.maps.Style
 import java.util.concurrent.Executors
 import org.maplibre.android.MapLibre
@@ -256,12 +257,17 @@ class MainActivity : Activity(), LocationListener {
         val mode = prefs.getString("mapSourceMode","online") ?: "online"
         val sha = prefs.getString("pmtilesActiveSha","") ?: ""
         val url = MapStyleDefaults.effective(prefs.getString("style", null))
-        val key = if(mode=="pmtiles_raster") "pmtiles:$sha" else "online:$url"
+        val vectorLayer = prefs.getString("pmtilesVectorLayer","") ?: ""
+        val key = when(mode) {
+            "pmtiles_raster" -> "pmtiles:raster:$sha"
+            "pmtiles_vector" -> "pmtiles:vector:$sha:$vectorLayer"
+            else -> "online:$url"
+        }
         if(key==selectedStyleKey) return
         selectedStyleKey=key
         val epoch=++currentStyleEpoch
         offlineHeader=null
-        if(mode!="pmtiles_raster") {
+        if(mode!="pmtiles_raster" && mode!="pmtiles_vector") {
             mapStatusLabel.text = "Bản đồ online: cần Internet và tile server đang hoạt động."
             m.setStyle(url) {
                 if(epoch!=currentStyleEpoch) return@setStyle
@@ -279,15 +285,22 @@ class MainActivity : Activity(), LocationListener {
             val archive=PmtilesArchiveStore(applicationContext).loadVerified()
             runOnUiThread {
                 if(isFinishing || isDestroyed || epoch!=currentStyleEpoch) return@runOnUiThread
-                if(archive==null || !archive.header.isRaster || archive.sha256!=sha) {
-                    mapStatusLabel.text = "PMTiles không hợp lệ / chưa chọn raster. Vào Cài đặt để chọn bản đồ online."
+                val correctArchive=archive!=null && archive.sha256==sha
+                val validRaster=mode=="pmtiles_raster" && archive?.header?.isRaster==true
+                val validVector=mode=="pmtiles_vector" && archive?.header?.tileType==1 &&
+                    archive.vectorInfo?.layers?.contains(vectorLayer)==true
+                if(!correctArchive || !(validRaster || validVector)) {
+                    mapStatusLabel.text = "PMTiles không hợp lệ, hoặc source-layer vector chưa tồn tại. Hãy chọn lại trong Cài đặt."
                     m.setStyle(Style.Builder().fromJson(
                         """{"version":8,"sources":{},"layers":[]}"""))
                     return@runOnUiThread
                 }
                 try {
                     val selected=archive.header
-                    m.setStyle(Style.Builder().fromJson(PmtilesRasterStyle.make(archive))) {
+                    val generatedStyle = if(validVector)
+                        PmtilesVectorStyle.make(archive!!.tileUri,vectorLayer,archive.attribution)
+                        else PmtilesRasterStyle.make(archive!!)
+                    m.setStyle(Style.Builder().fromJson(generatedStyle)) {
                         if(epoch!=currentStyleEpoch) return@setStyle
                         offlineHeader=selected
                         vehicleMarker=null
@@ -301,9 +314,10 @@ class MainActivity : Activity(), LocationListener {
                                 else LatLng(selected.centerLat,selected.centerLon))
                             .zoom(selected.centerZoom.toDouble().coerceIn(
                                 selected.minZoom.toDouble(),selected.maxZoom.toDouble())).build()
+                        val typeLabel=if(validVector) "vector OSM (chưa xác minh)" else "raster"
                         mapStatusLabel.text=if(inside)
-                            "PMTiles raster cục bộ: chỉ trong vùng đã lưu (chưa kiểm thử tile)."
-                        else "GPS ngoài vùng PMTiles. Đang xem tâm vùng lưu (không phải vị trí xe)."
+                            "PMTiles $typeLabel cục bộ: kiểm tra tile thực trên thiết bị."
+                        else "GPS ngoài vùng PMTiles $typeLabel. Đang xem tâm vùng lưu."
                         renderNearbySigns(lastLocation)
                         if(inside && fix!=null) follow(fix)
                     }

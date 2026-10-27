@@ -37,6 +37,8 @@ class PmtilesManagerActivity : Activity() {
     private lateinit var consent: CheckBox
     private lateinit var choose: Button
     private lateinit var preview: Button
+    private lateinit var vectorLayerInput: AutoCompleteTextView
+    private lateinit var vectorStatus: TextView
     private lateinit var applyDashboard: Button
     private lateinit var mapView: MapView
     private lateinit var visibleTiles: CheckBox
@@ -65,8 +67,8 @@ class PmtilesManagerActivity : Activity() {
         fun field(hintText:String): EditText = EditText(this).apply {
             hint=hintText;setSingleLine(true);controls.addView(this)
         }
-        text("PMTiles v3 cục bộ — chỉ xem thử bản đồ raster")
-        text("Chọn tệp PNG/JPEG/WebP PMTiles từ bộ nhớ. Gói vector có thể lưu nhưng cần style riêng để hiển thị. Tệp không được kiểm định pháp lý.")
+        text("PMTiles v3 cục bộ — Raster và MVT Vector (bản thử)")
+        text("Tệp Raster PNG/JPEG/WebP có preview. Tệp MVT Vector có thể vẽ đường từ source-layer được khai báo trong chính PMTiles; không giả định có dữ liệu dẫn đường hoặc tốc độ.")
         sourceInput=field("Nhà cung cấp và ID bộ dữ liệu")
         licenseInput=field("Giấy phép cho phép sử dụng và lưu offline")
         attributionInput=field("Attribution / ghi công nhà cung cấp")
@@ -96,18 +98,46 @@ class PmtilesManagerActivity : Activity() {
             setOnClickListener { showRaster() }
         }
         controls.addView(preview)
+        vectorStatus=TextView(this).apply {
+            text="MVT Vector: chưa có source-layer hợp lệ."
+            textSize=14f
+        }
+        controls.addView(vectorStatus)
+        vectorLayerInput=AutoCompleteTextView(this).apply {
+            hint="Chọn source-layer từ metadata PMTiles"
+            threshold=0
+            setSingleLine(true)
+            setOnClickListener { showDropDown() }
+        }
+        controls.addView(vectorLayerInput)
+        controls.addView(Button(this).apply {
+            text="Xem thử đường vector đã nhập"
+            setOnClickListener { showVector() }
+        })
         applyDashboard=Button(this).apply {
-            text="Dùng PMTiles raster này trên Dashboard"
+            text="Dùng PMTiles raster/vector này trên Dashboard"
             isEnabled=false
             setOnClickListener {
                 val archive=loaded
-                if(archive==null || !archive.header.isRaster) {
-                    message.text="Chỉ gói raster PNG/JPEG/WebP mới đặt làm bản đồ mặc định."
-                } else {
+                if(archive==null) {
+                    message.text="Chưa nhập gói PMTiles hợp lệ."
+                } else if(archive.header.isRaster) {
                     getSharedPreferences("taxi",MODE_PRIVATE).edit()
                         .putString("mapSourceMode","pmtiles_raster")
-                        .putString("pmtilesActiveSha",archive.sha256).apply()
-                    message.text="Đã chọn PMTiles raster làm nền Dashboard. Quay lại Dashboard để xem."
+                        .putString("pmtilesActiveSha",archive.sha256)
+                        .remove("pmtilesVectorLayer").apply()
+                    message.text="Đã chọn raster làm nền Dashboard. Quay lại Dashboard."
+                } else if(archive.header.tileType==1) {
+                    val layer=vectorLayerInput.text.toString().trim()
+                    if(archive.vectorInfo?.layers?.contains(layer) != true) {
+                        message.text="Phải chọn một source-layer có thật trong metadata của gói."
+                    } else {
+                        getSharedPreferences("taxi",MODE_PRIVATE).edit()
+                            .putString("mapSourceMode","pmtiles_vector")
+                            .putString("pmtilesActiveSha",archive.sha256)
+                            .putString("pmtilesVectorLayer",layer).apply()
+                        message.text="Đã chọn lớp '$layer' để xem đường trên Dashboard. Đây chỉ là hình học OSM, không phải định tuyến hợp pháp."
+                    }
                 }
             }
         }
@@ -150,9 +180,12 @@ class PmtilesManagerActivity : Activity() {
                     .setPositiveButton("Xóa") { _,_ ->
                         preview.isEnabled=false
                         applyDashboard.isEnabled=false
+                        vectorLayerInput.setText("")
+                        vectorStatus.text="Chưa có vector metadata."
                         getSharedPreferences("taxi",MODE_PRIVATE).edit()
                             .putString("mapSourceMode","online")
-                            .remove("pmtilesActiveSha").apply()
+                            .remove("pmtilesActiveSha")
+                            .remove("pmtilesVectorLayer").apply()
                         map?.setStyle(Style.Builder().fromJson(
                             """{"version":8,"sources":{},"layers":[]}"""))
                         executor.execute {
@@ -191,8 +224,10 @@ class PmtilesManagerActivity : Activity() {
                 if(isFinishing||isDestroyed) return@runOnUiThread
                 loaded=archive
                 styleReady=false
+                updateVectorSelection(archive)
                 preview.isEnabled=archive?.header?.isRaster==true
-                applyDashboard.isEnabled=archive?.header?.isRaster==true
+                applyDashboard.isEnabled=archive?.header?.isRaster==true ||
+                    archive?.vectorInfo?.previewable==true
                 message.text=if(archive==null) "Chưa có archive hợp lệ, hoặc checksum không khớp."
                     else "SHA-256: " + archive.sha256.take(16) + "… · " +
                         archive.header.formatName + " · z" + archive.header.minZoom + "–" +
@@ -231,8 +266,10 @@ class PmtilesManagerActivity : Activity() {
                 result.onSuccess { archive ->
                     loaded=archive
                     styleReady=false
+                    updateVectorSelection(archive)
                     preview.isEnabled=archive.header.isRaster
-                    applyDashboard.isEnabled=archive.header.isRaster
+                    applyDashboard.isEnabled=archive.header.isRaster ||
+                        archive.vectorInfo?.previewable==true
                     message.text="Đã sao chép và xác minh cấu trúc: "+archive.header.formatName+
                         " · "+archive.file.length()/1024/1024+" MiB. SHA-256: "+archive.sha256+
                         ". Chưa kiểm tra chất lượng hoặc quyền pháp lý."
@@ -240,6 +277,59 @@ class PmtilesManagerActivity : Activity() {
                     message.text="Không thể nhập PMTiles: "+(error.message ?: "Lỗi đọc tệp")
                 }
             }
+        }
+    }
+    private fun updateVectorSelection(archive: PmtilesArchive?) {
+        val info = archive?.vectorInfo
+        val ids = info?.layers.orEmpty()
+        vectorLayerInput.setAdapter(ArrayAdapter(this,
+            android.R.layout.simple_dropdown_item_1line, ids))
+        val configured = getSharedPreferences("taxi",MODE_PRIVATE)
+            .getString("pmtilesVectorLayer",null)
+        vectorLayerInput.setText(when {
+            configured in ids -> configured
+            ids.size == 1 -> ids.first()
+            else -> ""
+        },false)
+        vectorStatus.text = when {
+            archive == null -> "Chưa có PMTiles."
+            archive.header.tileType != 1 -> "Gói raster: không cần source-layer."
+            ids.isNotEmpty() -> "MVT vector có ${ids.size} lớp: ${ids.take(10).joinToString(", ")}. " +
+                "Chọn đúng lớp đường, không phải tên tự đặt."
+            else -> "Không tìm thấy lớp vector: " +
+                (info?.warning ?: "Metadata không đủ; chưa hỗ trợ giải nén.")
+        }
+    }
+    private fun showVector() {
+        val archive = loaded ?:run {
+            message.text="Chưa có tệp PMTiles.";return
+        }
+        if(archive.header.tileType!=1) {
+            message.text="Chỉ hỗ trợ MVT vector, không dùng AVIF/MLT ở bản này."
+            return
+        }
+        val layer=vectorLayerInput.text.toString().trim()
+        if(archive.vectorInfo?.layers?.contains(layer)!=true) {
+            message.text="Chưa chọn đúng source-layer từ metadata thực tế của tệp."
+            return
+        }
+        val m=map ?:run {
+            message.text="MapLibre chưa sẵn sàng.";return
+        }
+        try {
+            styleReady=false
+            m.setStyle(Style.Builder().fromJson(PmtilesVectorStyle.make(
+                archive.tileUri,layer,archive.attribution))) {
+                styleReady=true
+                m.cameraPosition=CameraPosition.Builder()
+                    .target(LatLng(archive.header.centerLat,archive.header.centerLon))
+                    .zoom(archive.header.centerZoom.toDouble().coerceIn(
+                        archive.header.minZoom.toDouble(),archive.header.maxZoom.toDouble()))
+                    .build()
+                message.text="Đã tải cấu hình vector lớp '$layer'. Kiểm tra đường có hiển thị thực tế, cả khi bật chế độ máy bay. Dữ liệu này chưa dùng để chỉ đường."
+            }
+        } catch(e:Exception) {
+            message.text="Không mở được MVT: "+(e.message ?: "Lỗi style")
         }
     }
     private fun showRaster() {
