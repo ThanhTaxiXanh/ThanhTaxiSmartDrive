@@ -42,7 +42,7 @@ class SurveyRoutingQaTests(unittest.TestCase):
         self.assertTrue(errors(g,r))
         g["nodes"][0]["displayName"]=1234
         self.assertTrue(errors(g,r))
-        g["nodes"][0]["displayName"]="Trạm\\nGiả lập"
+        g["nodes"][0]["displayName"]="Trạm\nGiả lập"
         self.assertTrue(errors(g,r))
 
     def test_missing_source_ref(self):
