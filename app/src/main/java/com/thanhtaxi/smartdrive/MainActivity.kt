@@ -11,6 +11,8 @@ import android.graphics.drawable.GradientDrawable
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.net.Uri
@@ -56,6 +58,9 @@ class MainActivity : Activity(), LocationListener {
     private val handler = Handler(Looper.getMainLooper())
     private val engine = SpeedLimitEngine()
     private val compliance = SpeedCompliance()
+    private val alertDebouncer = SpeedAlertDebouncer()
+    private var tone: ToneGenerator? = null
+    private var displayedImageUri: String? = null
     private val matcher = GeoMatcher()
     private val signEngine = TrafficSignEngine()
     private var roadPack: RoadPack? = null
@@ -259,6 +264,13 @@ class MainActivity : Activity(), LocationListener {
         }
         limitLabel.setTextColor(if (level == SpeedSeverity.OVER || level == SpeedSeverity.SERIOUS)
             Color.RED else Color.rgb(255, 208, 66))
+        if (prefs.getBoolean("soundAlert", false) &&
+            alertDebouncer.shouldAlert(level, SystemClock.elapsedRealtime())) {
+            try {
+                if (tone == null) tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 55)
+                tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+            } catch (_: RuntimeException) { /* Some head units do not expose a notification stream */ }
+        }
         refreshMedia()
         refreshQr()
     }
@@ -295,11 +307,22 @@ class MainActivity : Activity(), LocationListener {
     }
     private fun refreshQr() {
         val uri = prefs.getString("paymentImage", null)
-        if (uri == null) { qrNotice.visibility = View.VISIBLE; return }
+        if (uri == null) {
+            if (displayedImageUri != null) qrImage.setImageDrawable(null)
+            displayedImageUri = null
+            qrNotice.visibility = View.VISIBLE
+            return
+        }
+        if (uri == displayedImageUri) return
         try {
             qrImage.setImageURI(Uri.parse(uri))
+            displayedImageUri = uri
             qrNotice.visibility = View.GONE
-        } catch (_: Exception) { qrNotice.text = "Không thể đọc ảnh, hãy chọn lại"; qrNotice.visibility = View.VISIBLE }
+        } catch (_: Exception) {
+            displayedImageUri = null
+            qrNotice.text = "Không thể đọc ảnh, hãy chọn lại"
+            qrNotice.visibility = View.VISIBLE
+        }
     }
     private fun refreshMedia() {
         try {
@@ -332,6 +355,8 @@ class MainActivity : Activity(), LocationListener {
     override fun onDestroy() {
         map?.removeAnnotations(signMarkers)
         signMarkers.clear()
+        tone?.release()
+        tone = null
         mapView.onDestroy()
         super.onDestroy()
     }

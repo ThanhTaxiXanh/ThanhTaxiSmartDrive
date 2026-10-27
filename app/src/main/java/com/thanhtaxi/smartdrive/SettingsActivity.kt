@@ -52,6 +52,13 @@ class SettingsActivity : Activity() {
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
+        content.addView(CheckBox(this).apply {
+            text = "Phát tiếng bíp nhẹ khi vượt ngưỡng (mặc định tắt)"
+            isChecked = prefs.getBoolean("soundAlert", false)
+            setOnCheckedChangeListener { _, checked ->
+                prefs.edit().putBoolean("soundAlert", checked).apply()
+            }
+        })
         heading("Ảnh / QR thanh toán")
         action("Chọn ảnh từ thiết bị") {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
