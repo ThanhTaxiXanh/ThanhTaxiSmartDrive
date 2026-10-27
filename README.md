@@ -117,3 +117,13 @@ Khi có road pack khảo sát và `routing.allowedTurns`, sự chuyển đoạn 
 cũng phải khớp với một lượt rẽ được đánh dấu `reviewed` trong đồ thị.
 Ứng dụng không tự coi hai đoạn có hình học giao nhau là nối được.
 Thiếu dữ liệu topology sẽ hiện `--` hoặc chưa xác định, không suy đoán.
+
+## Xem trước tuyến khảo sát offline khi xe đỗ
+
+Cài đặt → **Tính thử tuyến trên dữ liệu road pack đã nhập**; chọn hai
+node ID thuộc bộ dữ liệu `routing`, bấm Tính tuyến thử rồi
+**Xem các điểm đổi hướng**. Mỗi mô tả chỉ là đổi hướng hình học trên
+đồ thị do người dùng tự khai và không có ý nghĩa chỉ dẫn rẽ hợp pháp
+trên đường thật. Nền bản đồ thử tương thích cả PMTiles cục bộ đã nhập
+và style online đã chọn. Chưa có bản đồ đường được kiểm định cho toàn
+Bắc Giang–Bắc Ninh; cũng chưa có Android Auto CarAppService.

@@ -53,3 +53,8 @@ The application is not a substitute for visual observation of signs and road con
 - [x] Road-name Canvas overlay (system font, zero network glyphs), bounded 20 sample points, 9 labels
 - [x] Strict segment transition gate from reviewed routing allowedTurns (when graph exists)
 - [ ] Complete offline vector label placement from geometry, automatic hierarchy/typography, actual road packs, on-device QA
+
+- [x] Parked-only, offline graph geometry change preview with cumulative distances and audited directed turns
+- [x] Source/edge/turn topology structural QA gate in Python CI
+- [x] Route preview can use the active local raster/vector PMTiles basemap after SHA-256 check
+- [ ] Device trial with validated regional road packs; road restrictions, turns by vehicle/time and Android Auto navigation

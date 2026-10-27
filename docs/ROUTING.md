@@ -72,3 +72,28 @@ nền bản đồ có thể trống khi offline nếu style và tile chưa đư�
   hoặc ETA giao thông.
 * Gói do người dùng nhập tự đánh dấu reviewed không phải xác minh pháp lý;
   luôn quan sát biển báo thật và không sử dụng bản thử nghiệm làm chỉ dẫn lái xe.
+
+## Xem trước các điểm đổi hướng — bản thử nghiệm
+
+Tại **Cài đặt → Dẫn đường offline → Tính thử tuyến**, chọn ID nút xuất
+phát/đích thuộc bộ đồ thị khảo sát, bấm **Tính tuyến thử**. Ứng dụng dùng
+Dijkstra trên dữ liệu cục bộ, chạy trên luồng nền. Nút **Xem các điểm đổi
+hướng** mô tả sự đổi hướng *hình học* tại từng nút khảo sát cùng khoảng
+cách tích lũy. Các nhãn "trái/phải/gần thẳng" được tính từ tọa độ WGS84,
+**không phải chỉ dẫn tài xế rẽ**; ứng dụng không thực hiện đọc giọng nói hay
+điều hướng theo vị trí xe.
+
+Từng lượt chuyển tiếp giữa directed edges phải có chính xác
+`routing.allowedTurns` phù hợp đã đánh dấu `reviewed`, kể cả khi
+hai cạnh có cùng `segmentId`. Không được lấy một intersection hình
+học hoặc dữ liệu OSM chưa duyệt làm bằng chứng được phép đi qua.
+
+Màn hình xem trước hiện tải nguồn nền theo lựa chọn Dashboard:
+PMTiles raster/vector có SHA-256 hợp lệ từ bộ nhớ riêng, hoặc style online
+được chỉ định. Nếu chọn PMTiles lỗi, màn hình báo lỗi chứ không âm thầm
+chuyển sang tile Internet. Thành công tải style **chưa chứng minh tile
+đã hiển thị trên thiết bị**.
+
+Dữ liệu thực địa/Bắc Giang–Bắc Ninh chưa được phát hành dưới dạng đồ
+thị tuyến đáng tin cậy, do vậy chức năng chỉ dùng để kiểm thử bộ dữ liệu
+do người dùng nhập khi xe đỗ.

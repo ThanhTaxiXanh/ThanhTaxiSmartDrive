@@ -25,3 +25,13 @@ Giới hạn: so sánh trên tọa độ phẳng khoảng cách Haversine; chưa
 dữ liệu camera thực địa, luật thời điểm, biển phụ, phân làn, đường chồng tầng,
 biển tạm hay bản đồ quốc gia. QA đã qua kiểm tra cấu trúc vẫn cần
 thẩm định giấy phép và hiệu lực bởi con người.
+
+## QA đồ thị có hướng
+
+`tools/survey_routing_qa.py` được tích hợp vào công cụ
+`tools/survey_qa.py`: nó kiểm tra nút, ID cạnh, trùng ID, endpoint của
+cạnh với `segmentId`, hướng forward/reverse, khoảng cách, sự liên thông
+đúng node giữa hai cạnh trong `allowedTurns` và yêu cầu `sourceRef`
+đối với cạnh/lượt rẽ được đánh dấu reviewed. Cạnh reviewed trỏ đến
+segment chưa reviewed sẽ bị từ chối. Đây chỉ là kiểm tra cấu trúc và
+dữ liệu tự khai, **không** xác nhận lượt rẽ hợp pháp hay dữ liệu quốc gia.
