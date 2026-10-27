@@ -73,7 +73,20 @@ class RoutePreviewActivity : Activity() {
             orientation=LinearLayout.VERTICAL
             setPadding(12,12,12,12)
         }
-        root.addView(TextView(this).apply {
+        // Keep the map visible even on a compact phone with many debug controls.
+        // Controls remain available in an independently scrollable top pane.
+        val controls=LinearLayout(this).apply {
+            orientation=LinearLayout.VERTICAL
+        }
+        val controlsScroll=ScrollView(this).apply {
+            isFillViewport=false
+            addView(controls)
+        }
+        val controlsFraction=if(resources.configuration.orientation ==
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE) 0.48 else 0.54
+        root.addView(controlsScroll,LinearLayout.LayoutParams(-1,
+            (resources.displayMetrics.heightPixels*controlsFraction).toInt()))
+        controls.addView(TextView(this).apply {
             text="XEM TRƯỚC TUYẾN OFFLINE — KHÔNG DÙNG ĐỂ LÁI XE"
             textSize=19f
         })
@@ -83,7 +96,7 @@ class RoutePreviewActivity : Activity() {
         })
         val g=graph
         if (g==null || g.nodes.isEmpty()) {
-            root.addView(TextView(this).apply {
+            controls.addView(TextView(this).apply {
                 text="Chưa có graph trong road pack. Nhập routing.nodes, routing.edges, " +
                     "routing.allowedTurns có sourceRef để tính tuyến thử."
                 textSize=16f
@@ -105,15 +118,15 @@ class RoutePreviewActivity : Activity() {
         val start=choose("ID/tên điểm khảo sát hoặc tọa độ xuất phát")
         startInput=start
         val finish=choose("ID/tên điểm khảo sát hoặc tọa độ đến")
-        root.addView(start)
-        root.addView(finish)
+        controls.addView(start)
+        controls.addView(finish)
         routeStatus=TextView(this).apply {
             text="Đã nạp ${ids.size} nút. Tìm theo ID, tên nút trong road pack hoặc WGS84 ≤75m. " +
                 "Không có cơ sở dữ liệu địa chỉ Việt Nam; tên điểm chưa xác minh độc lập."
             textSize=14f
             maxLines=3
         }
-        root.addView(routeStatus)
+        controls.addView(routeStatus)
         val buttons=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
         val run=Button(this).apply { text="Tính tuyến thử" }
         detailButton=Button(this).apply {
@@ -136,13 +149,13 @@ class RoutePreviewActivity : Activity() {
         }
         buttons.addView(run,LinearLayout.LayoutParams(0,-2,1f))
         buttons.addView(detailButton,LinearLayout.LayoutParams(0,-2,1f))
-        root.addView(buttons)
+        controls.addView(buttons)
         val testCoordinates=EditText(this).apply {
             hint="Tọa độ mô phỏng GPS: vĩ độ,kinh độ (ví dụ 21.0,106.0)"
             setSingleLine(true)
             inputType=android.text.InputType.TYPE_CLASS_TEXT
         }
-        root.addView(testCoordinates)
+        controls.addView(testCoordinates)
         val simulatorButtons=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
         val simulate=Button(this).apply {
             text="Mô phỏng 3 GPS"
@@ -155,13 +168,13 @@ class RoutePreviewActivity : Activity() {
         }
         simulatorButtons.addView(simulate,LinearLayout.LayoutParams(0,-2,1f))
         simulatorButtons.addView(acceptAlternative,LinearLayout.LayoutParams(0,-2,1f))
-        root.addView(simulatorButtons)
+        controls.addView(simulatorButtons)
         val simulatedStatus=TextView(this).apply {
             text="Mô phỏng lệch tuyến hoàn toàn offline khi xe đỗ. Không đọc GPS thật, không phát chỉ dẫn."
             textSize=13f
             maxLines=4
         }
-        root.addView(simulatedStatus)
+        controls.addView(simulatedStatus)
         val liveControls=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
         liveGpsButton=Button(this).apply {
             text="Bật GPS thật (khi đỗ)"
@@ -194,14 +207,14 @@ class RoutePreviewActivity : Activity() {
         }
         liveControls.addView(liveGpsButton,LinearLayout.LayoutParams(0,-2,1f))
         liveControls.addView(originFromGpsButton,LinearLayout.LayoutParams(0,-2,1f))
-        root.addView(liveControls)
+        controls.addView(liveControls)
         liveGpsStatus=TextView(this).apply {
             text="GPS thật: mặc định TẮT. Chỉ dùng khi xe đỗ an toàn. " +
                 "Đọc vị trí tại chỗ, không ghi lịch sử, không tự dẫn đường."
             textSize=13f
             maxLines=5
         }
-        root.addView(liveGpsStatus)
+        controls.addView(liveGpsStatus)
         acceptAlternative.setOnClickListener {
             val alternative=pendingAlternative ?:return@setOnClickListener
             latestPlan=alternative
