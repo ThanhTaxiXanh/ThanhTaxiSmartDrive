@@ -101,3 +101,36 @@ giấy phép offline. Nhập PMTiles có hai bước riêng: chọn file và xá
 quyền dùng, rồi xem thử raster và chọn làm nền Dashboard. MVT vector chưa
 có style tự động.
 
+
+## MVT vector Roads OSM (bản alpha tiếp theo)
+
+Bộ nhập **không giả định** lớp đường tên `roads`. Theo chuẩn PMTiles v3,
+khi Tile Type là MVT (1), metadata JSON của archive phải có `vector_layers`
+với các `id` nguồn. Android đọc metadata trực tiếp từ file đã sao chép
+theo byte offset của header, giải nén `none` hoặc `gzip`, giới hạn kích
+thước nén 256 KiB và dữ liệu giải nén 1 MiB, sau đó điền danh sách chọn
+source-layer ngay trong màn hình nhập PMTiles.
+
+Cách dùng:
+
+1. Chọn tệp `.pmtiles` MVT được phép lưu offline từ thiết bị và nhập thành công.
+2. Dưới **Xem thử raster**, xem các lớp do metadata khai báo; chọn lớp chứa
+   đường thực tế (tên có thể là `roads`, `transportation`, hoặc tên khác).
+3. Bấm **Xem thử đường vector đã nhập**. Style tối giản nền sáng và hai nét
+   đường, hoàn toàn lấy dữ liệu cục bộ; không cần glyph/sprite Internet.
+4. Nếu đường hiện đúng khu vực: bấm **Dùng PMTiles raster/vector này trên Dashboard**,
+   rồi quay lại Dashboard. Vị trí GPS nằm ngoài giới hạn file không được
+   dùng làm vị trí camera; Dashboard giữ camera ở tâm vùng đã tải.
+
+Dữ liệu **Roads (OSM) Vector Tiles** từ HOT/HDX là dữ liệu hình học
+không phải dữ liệu dẫn đường đã kiểm chứng, không có hướng dẫn rẽ/biển báo/tốc
+độ. Ứng dụng không tự suy diễn `reviewed=true` hay điều kiện pháp lý từ OSM.
+
+Giới hạn: với metadata nội bộ nén Brotli/Zstd, ứng dụng có thể nhập PMTiles
+nhưng chưa trích xuất source-layer bằng bản parser thử này. Tệp lớn hơn 1 GiB
+bị từ chối. Dữ liệu AVIF/MLT chưa hỗ trợ preview. Chưa thử thực tế trên
+điện thoại/đầu xe với chính archive HDX nêu trên.
+
+Tham khảo:
+- https://github.com/protomaps/PMTiles/blob/main/spec/v3/spec.md
+- https://maplibre.org/maplibre-native/android/examples/data/PMTiles/

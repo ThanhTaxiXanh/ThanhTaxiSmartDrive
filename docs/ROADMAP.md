@@ -38,3 +38,6 @@ The application is not a substitute for visual observation of signs and road con
 - [ ] Source verification signatures, national coverage, routing with restrictions
 - [x] PMTiles v3 importer and raster preview source; [ ] device-proven offline rendering and vector/MBTiles adapters
 - [ ] Android Auto Navigation template and live device driving safety QA (not discoverable with current APK)
+
+- [x] Bounded MVT vector metadata extraction and MapLibre source-layer selection, offline line style preview
+- [ ] Offline validated HDX Roads OSM archive in field; signed provenance and navigation semantics

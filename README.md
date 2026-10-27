@@ -55,3 +55,12 @@ phù hợp hoặc tải gói offline có đủ tile theo điều kiện giấy p
 Style: https://tiles.openfreemap.org/styles/liberty
 
 Nguồn/tài liệu: https://openfreemap.org/quick_start/
+
+## Cập nhật PMTiles MVT Vector (alpha)
+
+Trong Cài đặt → Nhập và xem thử tệp PMTiles, ứng dụng mới có thể đọc
+metadata `vector_layers` từ tệp MVT v3, cho chọn `source-layer`
+và vẽ các đường dưới dạng lớp Line trên nền sáng, không cần tile online.
+Dùng nút **Xem thử đường vector đã nhập** trước khi đặt làm nguồn
+Dashboard. Chức năng này chỉ là hiển thị đường, chưa phải điều hướng.
+Nguồn dữ liệu và giấy phép phải do người sử dụng kiểm tra.
