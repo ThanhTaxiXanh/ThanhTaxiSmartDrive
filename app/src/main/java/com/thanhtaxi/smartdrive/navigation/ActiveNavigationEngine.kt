@@ -30,7 +30,11 @@ data class NavigationUpdate(
     val nextManeuver: String? = null,
     val nextManeuverMeters: Double? = null,
     val crossTrackMeters: Double? = null,
-    val alternative: RoutePlan? = null
+    val alternative: RoutePlan? = null,
+    val progressMeters: Double? = null,
+    val etaSeconds: Long? = null,
+    val nextManeuverIndex: Int? = null,
+    val totalManeuvers: Int = 0
 )
 
 /**
@@ -47,6 +51,7 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
     private var offRouteStreak = 0
     private var arrivalStreak = 0
     private var proposal: RoutePlan? = null
+    private val eta=SimpleEtaEstimator()
     private var last = NavigationUpdate(NavigationPhase.IDLE, "Chưa chọn tuyến thử.")
 
     val current: NavigationUpdate get() = last
@@ -62,6 +67,7 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
         offRouteStreak = 0
         arrivalStreak = 0
         proposal = null
+        eta.reset()
         last = NavigationUpdate(NavigationPhase.GPS_UNCERTAIN,
             "Đã chọn tuyến thử • Đang đợi vị trí GPS đủ tin cậy.")
         return last
@@ -76,6 +82,7 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
         offRouteStreak = 0
         arrivalStreak = 0
         proposal = null
+        eta.reset()
         last = NavigationUpdate(NavigationPhase.IDLE, "Đã dừng hành trình thử.")
         return last
     }
@@ -95,6 +102,7 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
         offRouteStreak = 0
         arrivalStreak = 0
         proposal = null
+        eta.reset()
         last = NavigationUpdate(NavigationPhase.GPS_UNCERTAIN,
             "GPS không đủ tin cậy • Tạm ẩn hướng dẫn tuyến thử.")
         return last
@@ -173,6 +181,7 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
             arrivalStreak=0
             offRouteStreak++
             proposal=null
+            eta.reset()
             if(offRouteStreak<3) {
                 last=NavigationUpdate(NavigationPhase.POSSIBLY_OFF_ROUTE,
                     "GPS xa tuyến thử (${offRouteStreak}/3); chưa đề xuất đường.",crossTrackMeters=nearest)
@@ -215,13 +224,19 @@ class ActiveNavigationEngine(private val graph: OfflineRouteGraph) {
             return last
         }
 
-        val maneuver=instructions.firstOrNull { it.metresFromStart>progress+3.0 }
+        val maneuverIndex=instructions.indexOfFirst { it.metresFromStart>progress+3.0 }
+        val maneuver=instructions.getOrNull(maneuverIndex)
+        val remaining=(plan.metres-progress).coerceAtLeast(0.0)
+        val seconds=eta.estimate(remaining,fix.speedMetersPerSecond)
         last=NavigationUpdate(NavigationPhase.ACTIVE,
             "Đang theo tuyến khảo sát thử • KHÔNG xác thực giao thông",
-            remainingMeters=(plan.metres-progress).coerceAtLeast(0.0),
+            remainingMeters=remaining,
             nextManeuver=maneuver?.text ?: "Theo hình học tuyến đến điểm cuối thử",
             nextManeuverMeters=maneuver?.let { (it.metresFromStart-progress).coerceAtLeast(0.0) },
-            crossTrackMeters=chosen.cross)
+            crossTrackMeters=chosen.cross,progressMeters=progress,
+            etaSeconds=seconds,
+            nextManeuverIndex=maneuverIndex.takeIf { it>=0 },
+            totalManeuvers=instructions.size)
         return last
     }
 }

@@ -43,6 +43,23 @@ class ActiveNavigationEngineTest {
         assertTrue(second.nextManeuverMeters!! >= 0.0)
     }
 
+    @Test fun etaAppearsOnlyAfterTwoMovingProgressFixesAndDisappearsOnUnknown() {
+        val n=ActiveNavigationEngine(graph)
+        n.start(plan)
+        val first=n.observe(gps(),1000)
+        assertNull(first.etaSeconds)
+        val second=n.observe(gps(lon=106.00065,t=2000),2000)
+        assertEquals(NavigationPhase.ACTIVE,second.phase)
+        assertNotNull(second.etaSeconds)
+        assertTrue(second.etaSeconds!! in 1..200)
+        assertEquals(0,second.nextManeuverIndex)
+        assertEquals(1,second.totalManeuvers)
+        assertNotNull(second.progressMeters)
+        val uncertain=n.observe(gps(t=3000,acc=30.0),3000)
+        assertNull(uncertain.etaSeconds)
+        assertNull(uncertain.nextManeuver)
+    }
+
     @Test fun staleInaccurateMockAndWrongHeadingFailClosed() {
         val n=ActiveNavigationEngine(graph)
         n.start(plan)
