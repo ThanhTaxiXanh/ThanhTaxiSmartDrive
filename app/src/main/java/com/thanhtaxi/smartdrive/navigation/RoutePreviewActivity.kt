@@ -31,6 +31,9 @@ class RoutePreviewActivity : Activity() {
     private var map: MapLibreMap?=null
     private var previewLine: Polyline?=null
     private var latestPlan: RoutePlan?=null
+    private var selectedDestinationId: String?=null
+    private var pendingAlternative: RoutePlan?=null
+    private val deviationMonitor=RouteDeviationMonitor()
     private val background=Executors.newSingleThreadExecutor()
     private val graph by lazy { RoadPackRepository(this).load()?.routeGraph }
     private val prefs by lazy { getSharedPreferences("taxi",MODE_PRIVATE) }
@@ -78,12 +81,13 @@ class RoutePreviewActivity : Activity() {
                 setAdapter(ArrayAdapter(this@RoutePreviewActivity,
                     android.R.layout.simple_dropdown_item_1line,ids))
             }
-        val start=choose("ID nút xuất phát")
-        val finish=choose("ID nút đến")
+        val start=choose("ID nút hoặc tọa độ 'vĩ độ,kinh độ' xuất phát")
+        val finish=choose("ID nút hoặc tọa độ 'vĩ độ,kinh độ' điểm đến")
         root.addView(start)
         root.addView(finish)
         routeStatus=TextView(this).apply {
-            text="Đã nạp ${ids.size} nút khảo sát. Chọn ID nguồn và đích."
+            text="Đã nạp ${ids.size} nút khảo sát. Tìm theo ID hoặc WGS84 gần nút (≤75m). " +
+                "Không tìm được tên phố/POI Việt Nam ngoài gói dữ liệu."
             textSize=14f
             maxLines=3
         }
@@ -111,6 +115,81 @@ class RoutePreviewActivity : Activity() {
         buttons.addView(run,LinearLayout.LayoutParams(0,-2,1f))
         buttons.addView(detailButton,LinearLayout.LayoutParams(0,-2,1f))
         root.addView(buttons)
+        val testCoordinates=EditText(this).apply {
+            hint="Tọa độ mô phỏng GPS: vĩ độ,kinh độ (ví dụ 21.0,106.0)"
+            setSingleLine(true)
+            inputType=android.text.InputType.TYPE_CLASS_TEXT
+        }
+        root.addView(testCoordinates)
+        val simulatorButtons=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+        val simulate=Button(this).apply {
+            text="Mô phỏng 3 GPS"
+            isEnabled=false
+        }
+        val acceptAlternative=Button(this).apply {
+            text="Xem tuyến khác"
+            isEnabled=false
+        }
+        simulatorButtons.addView(simulate,LinearLayout.LayoutParams(0,-2,1f))
+        simulatorButtons.addView(acceptAlternative,LinearLayout.LayoutParams(0,-2,1f))
+        root.addView(simulatorButtons)
+        val simulatedStatus=TextView(this).apply {
+            text="Mô phỏng lệch tuyến hoàn toàn offline khi xe đỗ. Không đọc GPS thật, không phát chỉ dẫn."
+            textSize=13f
+            maxLines=4
+        }
+        root.addView(simulatedStatus)
+        acceptAlternative.setOnClickListener {
+            val alternative=pendingAlternative ?:return@setOnClickListener
+            latestPlan=alternative
+            deviationMonitor.reset()
+            pendingAlternative=null
+            acceptAlternative.isEnabled=false
+            routeStatus.text="Đang xem tuyến khảo sát thay thế theo dữ liệu nhập. Chưa xác minh đường thực."
+            showRoute(alternative)
+        }
+        simulate.setOnClickListener {
+            val plan=latestPlan ?:return@setOnClickListener
+            val destination=selectedDestinationId ?:return@setOnClickListener
+            val tokens=testCoordinates.text.toString().split(",")
+            val lat=tokens.getOrNull(0)?.trim()?.toDoubleOrNull()
+            val lon=tokens.getOrNull(1)?.trim()?.toDoubleOrNull()
+            if(tokens.size!=2 || lat==null || lon==null || !lat.isFinite() || !lon.isFinite() ||
+                lat !in -90.0..90.0 || lon !in -180.0..180.0) {
+                simulatedStatus.text="Chỉ nhập tọa độ WGS84 'vĩ độ,kinh độ' hợp lệ."
+                return@setOnClickListener
+            }
+            deviationMonitor.reset()
+            // Three DISTINCT timestamps, but generated solely from the parked
+            // simulation button. This NEVER counts as live GPS evidence.
+            var result=RouteDeviationResult(RouteDeviationState.UNKNOWN,null)
+            for(i in 0..2) {
+                result=deviationMonitor.observe(g,plan,lat,lon,3.0,1000L+i*1000L)
+            }
+            pendingAlternative=null
+            acceptAlternative.isEnabled=false
+            val distance=if(result.distanceMeters==null) "?" else
+                String.format(Locale.ROOT,"%.0f",result.distanceMeters)
+            simulatedStatus.text=when(result.state) {
+                RouteDeviationState.ON_ROUTE ->
+                    "MÔ PHỎNG: tọa độ gần tuyến ($distance m); không phải xác nhận GPS thật."
+                RouteDeviationState.SUSPECTED ->
+                    "MÔ PHỎNG: nghi lệch tuyến ($distance m), cần thêm mẫu nhất quán."
+                RouteDeviationState.UNKNOWN ->
+                    "MÔ PHỎNG: dữ liệu không hợp lệ hoặc thiếu cạnh được duyệt."
+                RouteDeviationState.OFF_ROUTE -> {
+                    val (lookup, alternative)=SurveyReroutePreview.candidate(
+                        g,lat,lon,destination,100.0)
+                    pendingAlternative=alternative?.takeIf { it.edgeIds.isNotEmpty() }
+                    acceptAlternative.isEnabled=pendingAlternative!=null
+                    if(pendingAlternative!=null)
+                        "MÔ PHỎNG: lệch tuyến $distance m; có tuyến tham khảo từ nút " +
+                            "${lookup.nodeId} (chỉ xem khi xe đỗ)."
+                    else "MÔ PHỎNG: lệch tuyến $distance m; không có đường thay thế " +
+                        "được khai báo từ nút gần đó. ${lookup.detail}"
+                }
+            }
+        }
         mapStatus=TextView(this).apply {
             text="Đang nạp nền bản đồ đã chọn…"
             textSize=13f
@@ -129,12 +208,20 @@ class RoutePreviewActivity : Activity() {
             loadBackgroundMap(loaded)
         }
         run.setOnClickListener {
-            val origin=start.text.toString().trim()
-            val destination=finish.text.toString().trim()
-            if(origin !in g.nodes || destination !in g.nodes) {
-                routeStatus.text="ID nút không tồn tại trong dữ liệu khảo sát."
+            val fromResult=SurveyPointSearch.resolve(g,start.text.toString())
+            val toResult=SurveyPointSearch.resolve(g,finish.text.toString())
+            val origin=fromResult.nodeId
+            val destination=toResult.nodeId
+            if(origin==null || destination==null) {
+                routeStatus.text="Không nhận diện được nút: ${fromResult.detail} / ${toResult.detail}"
                 return@setOnClickListener
             }
+            deviationMonitor.reset()
+            pendingAlternative=null
+            selectedDestinationId=destination
+            acceptAlternative.isEnabled=false
+            simulate.isEnabled=false
+            simulatedStatus.text="Chỉ thử mô phỏng sau khi tính được tuyến khảo sát."
             run.isEnabled=false
             detailButton.isEnabled=false
             routeStatus.text="Đang tính đồ thị có hướng cục bộ…"
@@ -150,12 +237,13 @@ class RoutePreviewActivity : Activity() {
                     latestPlan=result.getOrNull()
                     val p=latestPlan
                     detailButton.isEnabled=p!=null
+                    simulate.isEnabled=p!=null && p.edgeIds.isNotEmpty()
                     routeStatus.text=when {
                         result.isFailure -> "Tuyến không hợp lệ: ${result.exceptionOrNull()?.message}"
                         p==null -> "Không có tuyến trên đồ thị đã nhập. Không kết luận đường thật bị chặn."
                         else -> "Xem trước: ${p.edgeIds.size} cạnh khảo sát, " +
                             String.format(Locale.ROOT,"%.2f km",p.metres/1000.0) +
-                            ". Không phải hướng dẫn lái."
+                            ". ${fromResult.detail} ${toResult.detail} Không phải hướng dẫn lái."
                     }
                     showRoute(p)
                 }
