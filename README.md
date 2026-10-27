@@ -4,6 +4,23 @@ Dự án mã nguồn **Thanh Taxi Smart Drive** dành cho tài xế Việt Nam.
 
 **Trạng thái:** bản alpha nền tảng Kotlin/Android. Đã có mã giao diện Dashboard thực, MapLibre, cập nhật tốc độ GPS, tính lịch Âm Việt Nam offline, chọn ảnh/QR cục bộ, điều khiển MediaSession khi được cấp quyền, cơ chế nhập dữ liệu đoạn đường có nguồn và engine giới hạn tốc độ với kiểm thử.
 
+## Trạng thái Phase theo Master Prompt
+
+- **Phase 1 — Technical Feasibility & Architecture: đã hoàn thiện hồ sơ thiết kế,**
+  xác minh SDK/giới hạn Android Auto và tự động kiểm tra bộ tài liệu trong CI.
+  Xem [Hồ sơ nghiệm thu Phase 1](docs/phase1/README.md),
+  [PRD](docs/phase1/PRD.md),
+  [Kiến trúc](docs/phase1/ARCHITECTURE.md),
+  [Phân loại tính khả thi](docs/phase1/FEASIBILITY.md),
+  [SDK và giấy phép](docs/phase1/SDK-AND-LICENSES.md),
+  [Wireframes](docs/phase1/WIREFRAMES.md) và
+  [44 yêu cầu truy vết](docs/phase1/REQUIREMENTS.csv).
+- **Phase 2 đang triển khai.** Phase 3/4 có mã thử nghiệm nhưng chưa nghiệm thu.
+  Phase 5 Android Auto chưa triển khai; Phase 6 mới có CI/debug build.
+
+Phase 1 là *cổng thiết kế*, không chứng nhận tính pháp lý của tốc độ, bản đồ
+offline trên xe thật hoặc xuất hiện trong Android Auto.
+
 ## Build / APK
 1. Mở dự án bằng Android Studio có Android SDK 35 và JDK 17, hoặc cài Gradle 8.9.
 2. Chạy `gradle :app:testDebugUnitTest :app:assembleDebug`.

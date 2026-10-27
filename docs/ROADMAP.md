@@ -4,15 +4,21 @@
 Safe, offline-capable taxi navigation support in Vietnam; Android Phone Companion + compliant Android Auto
 + separately deployed full-custom Android head-unit dashboard.
 
-## Phase matrix (actual status as of first commit set)
-| Phase | Scope | State |
+## Phase matrix — 2026-10-27 after architecture review
+
+**Phase 1 architecture/documentation gate: complete**, conditional on successful GitHub Actions
+`python3 tools/phase1_check.py`. See **[Phase 1 acceptance package](phase1/README.md)**
+(`docs/phase1/README.md`). This **does not** mean the whole app is complete or has
+passed road trials, hardware tests, legal certification or Android Auto integration.
+
+| Phase | Master Prompt scope | Current evidence / state |
 |---|---|---|
-| 1 | Feasibility, architecture, product requirements, CI structure | implemented documentation |
-| 2 | GPS, map, speed, signs, routing, Free Drive | partial: GPS/map/free drive + conservative sign matching; new offline graph route planner & parked preview, but no field-verified routing coverage |
-| 3 | 4-panel UI, settings, lunar calendar, QR, media, layout presets | partial: standard landscape layout, local settings/image/media; editor/events missing |
-| 4 | AI signs, validated offline road packs, downloadable offline tiles | partial: MapLibre offline region pilot + PMTiles v3 SAF importer and raster preview + SHA-256/version rollback + surveyed CSV QA pipeline; no AI or signed authoritative data |
-| 5 | Compliant Android Auto CarAppService and tests | not implemented |
-| 6 | QA, road surveys in Bắc Giang–Bắc Ninh, signed release | not implemented |
+| **1** | Analyze SKILL and upstream references; Android Auto SDK; architecture; licenses; four-region feasibility | **COMPLETE: architecture baseline** — PRD, feasibility review, SDK and licenses, data model, head-unit/Android Auto wireframes, 44 traced requirements, ADRs, risk gates and CI documentation guard |
+| **2** | GPS, map matching, Free Drive, signs, speed/PIP/alerts and routing | **IN PROGRESS** — Kotlin GPS/MapLibre, road matcher and graph preview; actual field data, routing, speed PIP and road acceptance incomplete |
+| **3** | 4-panel Dashboard, layout editor, themes, calendar, QR, Media and settings | **PARTIAL PROTOTYPE** — custom Activity, lunar calendar/QR/Media; editable layouts, events/themes and responsive device QA missing |
+| **4** | Camera AI, offline map/sign packs, validation and updates | **PARTIAL PROTOTYPE** — PMTiles and QA; AI, signed legal data, full region coverage and device-proven offline render missing |
+| **5** | Android Auto CarAppService, navigation templates and host tests | **NOT IMPLEMENTED** — current APK will not show as Android Auto app |
+| **6** | Integration/device/road tests, performance, CI and signed release | **PARTIAL SUPPORT** — CI and Debug APK exist; field/device tests, full security QA and signed release missing |
 
 ## Feature feasibility
 - Official Android Auto: navigation / POI templates subject to category and UX policy, media APIs with permissions.
@@ -21,6 +27,9 @@ Safe, offline-capable taxi navigation support in Vietnam; Android Phone Companio
 - Cannot claim today: Android Auto four freely arranged panels, full traffic-sign coverage, certified legal speed limit, signed release APK.
 
 ## Completion gates
+0. **Phase 1**: source/SDK review, PRD, architectural design, wireframes, license audit and
+   the `tools/phase1_check.py` CI guard documented at [Phase 1](phase1/README.md).
+   This is an architecture gate, not Android Auto or commercial driving certification.
 1. Unit test success and debug APK from Actions;
 2. GPS and map on actual Android hardware;
 3. Verified source pack and sign/segment/lane consistency trials;
