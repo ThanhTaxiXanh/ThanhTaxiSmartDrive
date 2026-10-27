@@ -2,7 +2,13 @@ package com.thanhtaxi.smartdrive.navigation
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Color
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.os.SystemClock
 import android.os.Bundle
 import android.widget.*
 import com.thanhtaxi.smartdrive.data.RoadPackRepository
@@ -41,6 +47,19 @@ class RoutePreviewActivity : Activity() {
     private lateinit var mapStatus: TextView
     private lateinit var detailButton: Button
     private var destroyed=false
+    private val locationManager by lazy {
+        getSystemService(LOCATION_SERVICE) as LocationManager
+    }
+    private var liveGpsListener: LocationListener?=null
+    private var lastValidParkedFix: ParkedGpsSample?=null
+    private lateinit var liveGpsButton: Button
+    private lateinit var originFromGpsButton: Button
+    private lateinit var liveGpsStatus: TextView
+    private lateinit var simulationButton: Button
+    private lateinit var startInput: AutoCompleteTextView
+    private val liveDeviation=RouteDeviationMonitor()
+    private var lastRealFixTimeMs: Long?=null
+    private val GPS_PERMISSION_REQUEST = 1412
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,7 +91,9 @@ class RoutePreviewActivity : Activity() {
             setContentView(root)
             return
         }
-        val ids=g.nodes.keys.sorted()
+        val ids=g.nodes.values.sortedBy { it.id }.map { n ->
+            if(n.displayName.isNullOrBlank()) n.id else "${n.displayName} (${n.id})"
+        }
         fun choose(label:String): AutoCompleteTextView =
             AutoCompleteTextView(this).apply {
                 hint=label
@@ -81,13 +102,14 @@ class RoutePreviewActivity : Activity() {
                 setAdapter(ArrayAdapter(this@RoutePreviewActivity,
                     android.R.layout.simple_dropdown_item_1line,ids))
             }
-        val start=choose("ID nút hoặc tọa độ 'vĩ độ,kinh độ' xuất phát")
-        val finish=choose("ID nút hoặc tọa độ 'vĩ độ,kinh độ' điểm đến")
+        val start=choose("ID/tên điểm khảo sát hoặc tọa độ xuất phát")
+        startInput=start
+        val finish=choose("ID/tên điểm khảo sát hoặc tọa độ đến")
         root.addView(start)
         root.addView(finish)
         routeStatus=TextView(this).apply {
-            text="Đã nạp ${ids.size} nút khảo sát. Tìm theo ID hoặc WGS84 gần nút (≤75m). " +
-                "Không tìm được tên phố/POI Việt Nam ngoài gói dữ liệu."
+            text="Đã nạp ${ids.size} nút. Tìm theo ID, tên nút trong road pack hoặc WGS84 ≤75m. " +
+                "Không có cơ sở dữ liệu địa chỉ Việt Nam; tên điểm chưa xác minh độc lập."
             textSize=14f
             maxLines=3
         }
@@ -126,6 +148,7 @@ class RoutePreviewActivity : Activity() {
             text="Mô phỏng 3 GPS"
             isEnabled=false
         }
+        simulationButton=simulate
         val acceptAlternative=Button(this).apply {
             text="Xem tuyến khác"
             isEnabled=false
@@ -139,6 +162,46 @@ class RoutePreviewActivity : Activity() {
             maxLines=4
         }
         root.addView(simulatedStatus)
+        val liveControls=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+        liveGpsButton=Button(this).apply {
+            text="Bật GPS thật (khi đỗ)"
+            setOnClickListener {
+                if(liveGpsListener!=null) stopParkedGps("Đã dừng đọc GPS thật.")
+                else startParkedGps()
+            }
+        }
+        originFromGpsButton=Button(this).apply {
+            text="Điểm đi = GPS"
+            isEnabled=false
+            setOnClickListener {
+                val fix=lastValidParkedFix ?:return@setOnClickListener
+                if(ParkedGpsQuality.check(fix,SystemClock.elapsedRealtime()) !=
+                    ParkedGpsDecision.VALID_STATIONARY) {
+                    liveGpsStatus.text="Vị trí GPS đã cũ hoặc không còn đủ tin cậy."
+                    originFromGpsButton.isEnabled=false
+                    return@setOnClickListener
+                }
+                val source=SurveyPointSearch.resolve(g,
+                    "${fix.latitude},${fix.longitude}",75.0)
+                if(source.nodeId==null) {
+                    liveGpsStatus.text="Không thể chọn điểm đi: ${source.detail}"
+                } else {
+                    startInput.setText(source.nodeId)
+                    liveGpsStatus.text="Đã chọn nút ${source.nodeId} gần GPS đang đỗ. " +
+                        "Hãy xác nhận thủ công trước khi tính tuyến."
+                }
+            }
+        }
+        liveControls.addView(liveGpsButton,LinearLayout.LayoutParams(0,-2,1f))
+        liveControls.addView(originFromGpsButton,LinearLayout.LayoutParams(0,-2,1f))
+        root.addView(liveControls)
+        liveGpsStatus=TextView(this).apply {
+            text="GPS thật: mặc định TẮT. Chỉ dùng khi xe đỗ an toàn. " +
+                "Đọc vị trí tại chỗ, không ghi lịch sử, không tự dẫn đường."
+            textSize=13f
+            maxLines=5
+        }
+        root.addView(liveGpsStatus)
         acceptAlternative.setOnClickListener {
             val alternative=pendingAlternative ?:return@setOnClickListener
             latestPlan=alternative
@@ -149,6 +212,10 @@ class RoutePreviewActivity : Activity() {
             showRoute(alternative)
         }
         simulate.setOnClickListener {
+            if(liveGpsListener!=null) {
+                simulatedStatus.text="Tắt GPS thật trước khi dùng dữ liệu mô phỏng."
+                return@setOnClickListener
+            }
             val plan=latestPlan ?:return@setOnClickListener
             val destination=selectedDestinationId ?:return@setOnClickListener
             val tokens=testCoordinates.text.toString().split(",")
@@ -208,6 +275,7 @@ class RoutePreviewActivity : Activity() {
             loadBackgroundMap(loaded)
         }
         run.setOnClickListener {
+            if(liveGpsListener!=null) stopParkedGps("Đã dừng GPS để chọn tuyến mới.")
             val fromResult=SurveyPointSearch.resolve(g,start.text.toString())
             val toResult=SurveyPointSearch.resolve(g,finish.text.toString())
             val origin=fromResult.nodeId
@@ -237,7 +305,8 @@ class RoutePreviewActivity : Activity() {
                     latestPlan=result.getOrNull()
                     val p=latestPlan
                     detailButton.isEnabled=p!=null
-                    simulate.isEnabled=p!=null && p.edgeIds.isNotEmpty()
+                    simulate.isEnabled=p!=null && p.edgeIds.isNotEmpty() &&
+                        liveGpsListener==null
                     routeStatus.text=when {
                         result.isFailure -> "Tuyến không hợp lệ: ${result.exceptionOrNull()?.message}"
                         p==null -> "Không có tuyến trên đồ thị đã nhập. Không kết luận đường thật bị chặn."
@@ -248,6 +317,116 @@ class RoutePreviewActivity : Activity() {
                     showRoute(p)
                 }
             }
+        }
+    }
+
+    /**
+     * Foreground-only stationary diagnostic. No tracking history or navigation.
+     * The operator must separately confirm the car is parked; low GPS speed
+     * does not prove the vehicle is parked or authorize driver interaction.
+     */
+    private fun startParkedGps() {
+        if(destroyed || isFinishing || !::liveGpsStatus.isInitialized) return
+        if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) !=
+            PackageManager.PERMISSION_GRANTED) {
+            liveGpsStatus.text="Cần cấp quyền vị trí chính xác để xem GPS thật khi xe đỗ."
+            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),GPS_PERMISSION_REQUEST)
+            return
+        }
+        if(!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            liveGpsStatus.text="GPS chưa bật. Hãy bật vị trí chính xác trong Cài đặt Android."
+            return
+        }
+        lastValidParkedFix=null
+        lastRealFixTimeMs=null
+        liveDeviation.reset()
+        originFromGpsButton.isEnabled=false
+        val listener=object: LocationListener {
+            override fun onLocationChanged(location: Location) {
+                if(destroyed || liveGpsListener!==this) return
+                val fix=ParkedGpsSample(location.latitude,location.longitude,
+                    location.accuracy.toDouble().takeIf { location.hasAccuracy() },
+                    location.speed.toDouble().takeIf { location.hasSpeed() },
+                    location.elapsedRealtimeNanos / 1_000_000L,
+                    location.isFromMockProvider)
+                val decision=ParkedGpsQuality.check(fix,SystemClock.elapsedRealtime())
+                if(decision==ParkedGpsDecision.MOVING_STOP) {
+                    stopParkedGps("Đã phát hiện chuyển động (≥2,9 km/h). " +
+                        "Dừng công cụ để tránh thao tác khi lái xe.")
+                    return
+                }
+                if(decision!=ParkedGpsDecision.VALID_STATIONARY) {
+                    lastValidParkedFix=null
+                    originFromGpsButton.isEnabled=false
+                    liveDeviation.reset()
+                    lastRealFixTimeMs=null
+                    liveGpsStatus.text="GPS thật: chưa đủ điều kiện (${decision.name}). " +
+                        "Cần mẫu mới, chính xác, tốc độ thấp. Không tính lệch tuyến."
+                    return
+                }
+                if(lastRealFixTimeMs!=null && fix.elapsedRealtimeMs<=lastRealFixTimeMs!!) {
+                    liveGpsStatus.text="GPS thật: mẫu trùng/không tiến thời gian; bỏ qua."
+                    return
+                }
+                lastRealFixTimeMs=fix.elapsedRealtimeMs
+                lastValidParkedFix=fix
+                originFromGpsButton.isEnabled=true
+                val plan=latestPlan
+                val g=graph
+                if(plan==null || g==null || plan.edgeIds.isEmpty()) {
+                    liveGpsStatus.text="GPS thật đủ điều kiện khi xe đỗ (±${fix.accuracyMeters?.toInt()}m). " +
+                        "Chưa có tuyến khảo sát để so sánh. Không lưu tọa độ."
+                    return
+                }
+                val result=liveDeviation.observe(g,plan,fix.latitude,fix.longitude,
+                    fix.accuracyMeters!!,fix.elapsedRealtimeMs)
+                val offset=if(result.distanceMeters==null) "?" else
+                    String.format(Locale.ROOT,"%.0f",result.distanceMeters)
+                liveGpsStatus.text="GPS thật (xe đỗ): ${result.state.name}, " +
+                    "cách hình học tuyến khoảng $offset m. " +
+                    "Chỉ là chẩn đoán, không tự tính lại tuyến hay phát chỉ dẫn."
+            }
+            override fun onProviderDisabled(provider: String) {
+                stopParkedGps("GPS đã bị tắt; dừng phiên đọc vị trí.")
+            }
+        }
+        try {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
+                1000L,0f,listener)
+            liveGpsListener=listener
+            liveGpsButton.text="Tắt GPS thật"
+            if(::simulationButton.isInitialized) simulationButton.isEnabled=false
+            liveGpsStatus.text="Đang đợi GPS thực tế, tốc độ và độ chính xác; " +
+                "dữ liệu chỉ tồn tại trong RAM của màn hình đang mở."
+        } catch(e:Exception) {
+            liveGpsListener=null
+            liveGpsStatus.text="Không bắt đầu được GPS thật: ${e.message ?: "thiếu quyền"}"
+        }
+    }
+
+    private fun stopParkedGps(reason: String) {
+        liveGpsListener?.let { listener ->
+            runCatching { locationManager.removeUpdates(listener) }
+        }
+        liveGpsListener=null
+        lastValidParkedFix=null
+        lastRealFixTimeMs=null
+        liveDeviation.reset()
+        if(::liveGpsButton.isInitialized) liveGpsButton.text="Bật GPS thật (khi đỗ)"
+        if(::originFromGpsButton.isInitialized) originFromGpsButton.isEnabled=false
+        if(::simulationButton.isInitialized)
+            simulationButton.isEnabled=latestPlan?.edgeIds?.isNotEmpty()==true
+        if(::liveGpsStatus.isInitialized) liveGpsStatus.text=reason
+    }
+
+    override fun onRequestPermissionsResult(requestCode:Int, permissions:Array<out String>,
+                                            grantResults:IntArray) {
+        super.onRequestPermissionsResult(requestCode,permissions,grantResults)
+        if(requestCode==GPS_PERMISSION_REQUEST && !destroyed && !isFinishing) {
+            if(grantResults.firstOrNull()==PackageManager.PERMISSION_GRANTED)
+                startParkedGps()
+            else if(::liveGpsStatus.isInitialized)
+                liveGpsStatus.text="Không được cấp quyền GPS; giữ trạng thái chưa xác định."
         }
     }
 
@@ -318,9 +497,14 @@ class RoutePreviewActivity : Activity() {
 
     override fun onStart() { super.onStart();if(::mapView.isInitialized)mapView.onStart() }
     override fun onResume() { super.onResume();if(::mapView.isInitialized)mapView.onResume() }
-    override fun onPause() { if(::mapView.isInitialized)mapView.onPause();super.onPause() }
+    override fun onPause() {
+        stopParkedGps("Màn hình tạm dừng: GPS thật đã tự tắt. Bật lại khi xe vẫn đang đỗ.")
+        if(::mapView.isInitialized)mapView.onPause()
+        super.onPause()
+    }
     override fun onStop() { if(::mapView.isInitialized)mapView.onStop();super.onStop() }
     override fun onDestroy() {
+        stopParkedGps("Đã đóng màn hình.")
         destroyed=true
         background.shutdownNow()
         if(::mapView.isInitialized)mapView.onDestroy()
