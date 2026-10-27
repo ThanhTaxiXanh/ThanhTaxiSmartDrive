@@ -5,7 +5,15 @@ import kotlin.math.*
 
 /** Route graph is user-supplied and survey-labelled; reviewed is NOT government certification. */
 data class RouteNode(val id: String, val lat: Double, val lon: Double,
-                     val displayName: String? = null)
+                     val displayName: String? = null,
+                     val aliases: List<String> = emptyList())
+/** Independently labeled local point mapped to a surveyed node, never a national POI. */
+enum class LocalPlaceCategory { PICKUP, DROPOFF, PARKING, REST, OTHER }
+data class SurveyDestination(val id:String, val title:String, val nodeId:String,
+                             val category:LocalPlaceCategory,
+                             val aliases:List<String> = emptyList(),
+                             val sourceRef:String)
+
 data class RouteEdge(
     val id: String, val from: String, val to: String,
     val segmentId: String, val metres: Double, val reviewed: Boolean,
@@ -26,7 +34,8 @@ data class SegmentEta(val edgeId: String, val enterEpochMs: Long,
 class OfflineRouteGraph(
     nodes: List<RouteNode>,
     edges: List<RouteEdge>,
-    turns: List<AllowedTurn>
+    turns: List<AllowedTurn>,
+    val destinations: List<SurveyDestination> = emptyList()
 ) {
     val nodes: Map<String, RouteNode>
     private val outgoing: Map<String, List<RouteEdge>>
@@ -42,9 +51,20 @@ class OfflineRouteGraph(
                 it.displayName.none { c -> c.isISOControl() })) &&
             it.lat.isFinite() && it.lon.isFinite() &&
             it.lat in -90.0..90.0 && it.lon in -180.0..180.0 })
+        require(nodes.all { it.aliases.size<=8 &&
+            it.aliases.all { a -> a.length in 1..100 && a.none { c -> c.isISOControl() } } })
         require(nodes.distinctBy { it.id }.size == nodes.size) { "Duplicate graph node" }
         require(edges.distinctBy { it.id }.size == edges.size) { "Duplicate graph edge" }
         this.nodes = nodes.associateBy { it.id }
+        require(destinations.size<=20_000 && destinations.distinctBy { it.id }.size==destinations.size)
+        require(destinations.all { d ->
+            d.id.isNotBlank() && d.id.length<=96 && d.nodeId in this.nodes &&
+            d.title.length in 1..100 && d.title.none { it.isISOControl() } &&
+            d.sourceRef.isNotBlank() && d.sourceRef.length<=256 &&
+            d.aliases.size<=8 && d.aliases.all { a ->
+                a.length in 1..100 && a.none { it.isISOControl() }
+            }
+        }) { "Offline destinations need valid local node and provenance" }
         require(edges.all { it.id.isNotBlank() && it.segmentId.isNotBlank() &&
             it.from in this.nodes && it.to in this.nodes && it.from != it.to &&
             it.metres.isFinite() && it.metres in 2.0..3000.0 &&
