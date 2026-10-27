@@ -229,3 +229,11 @@ Không coi `modelSpeedKph` là giới hạn pháp lý. Dữ liệu POI/giao thô
 giấy phép và kiểm tra độc lập trước khi dùng ngoài đường.
 
 [Schema, ví dụ JSON và giới hạn an toàn](docs/phase2/ROUTING-RESTRICTIONS.md).
+
+## Tìm điểm đến offline bằng SQLite FTS5 (Phase 4 alpha)
+
+Cài đặt → Tìm điểm đến offline (chỉ khi xe đỗ): nhập gói SQLite FTS5/RTree
+do người dùng tạo từ CSV có giấy phép, kiểm SHA-256, tìm địa chỉ/tên có dấu
+hoặc không dấu, sao chép tọa độ hay chuyển sang xem trước tuyến khảo sát.
+Không kèm dữ liệu POI toàn quốc và không chứng nhận tuyến hợp pháp.
+Chi tiết: [Tìm POI offline](docs/phase4/OFFLINE-POI-SEARCH.md).

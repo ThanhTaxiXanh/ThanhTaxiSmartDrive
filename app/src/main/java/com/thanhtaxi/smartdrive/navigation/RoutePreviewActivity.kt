@@ -142,6 +142,17 @@ class RoutePreviewActivity : Activity() {
         val start=choose("ID/tên điểm khảo sát hoặc tọa độ xuất phát")
         startInput=start
         val finish=choose("ID/tên điểm khảo sát hoặc tọa độ đến")
+        // POI may only seed a destination coordinate for PARKED survey preview.
+        // Resolving it still requires an existing node within the graph tolerance.
+        intent.getStringExtra("previewDestinationCoordinate")?.let { coordinate ->
+            val pair = coordinate.split(',')
+            if (pair.size == 2) {
+                val lat = pair[0].toDoubleOrNull()
+                val lon = pair[1].toDoubleOrNull()
+                if (lat != null && lon != null && lat in -90.0..90.0 && lon in -180.0..180.0)
+                    finish.setText("$lat,$lon")
+            }
+        }
         controls.addView(start)
         controls.addView(finish)
         val vehicleChoices=RoutingVehicle.entries.map { it.name }
