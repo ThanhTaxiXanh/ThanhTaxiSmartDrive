@@ -126,6 +126,14 @@ class PmtilesArchiveStore(private val context: Context) {
             manifest.getString("attribution"))
     }.getOrNull()
 
+    @Synchronized fun deleteActiveArchive(): Boolean {
+        val raw = prefs.getString("active", null) ?: return false
+        val hash = JSONObject(raw).getString("sha256")
+        require(hashPattern.matches(hash)) { "Invalid archive identifier" }
+        val archive = File(folder,"$hash.pmtiles")
+        check(prefs.edit().remove("active").commit()) { "Unable to clear active archive" }
+        return !archive.exists() || archive.delete()
+    }
     @Synchronized fun clearActive() {
         check(prefs.edit().remove("active").commit())
     }

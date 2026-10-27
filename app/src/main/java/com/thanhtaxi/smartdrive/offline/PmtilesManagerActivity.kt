@@ -85,13 +85,27 @@ class PmtilesManagerActivity : Activity() {
         }
         controls.addView(preview)
         controls.addView(Button(this).apply {
-            text="Xóa gói đang chọn khỏi danh sách (không xóa tệp lưu trữ)"
+            text="Xóa gói PMTiles đang chọn khỏi bộ nhớ riêng"
             setOnClickListener {
                 AlertDialog.Builder(this@PmtilesManagerActivity)
-                    .setTitle("Ngừng sử dụng archive đã chọn?")
-                    .setPositiveButton("Bỏ chọn") { _,_ ->
-                        store.clearActive();loaded=null;preview.isEnabled=false
-                        message.text="Đã bỏ chọn gói. Tệp vẫn trong bộ nhớ riêng cho đến khi có công cụ dọn dẹp."
+                    .setTitle("Xóa archive PMTiles đã chọn?")
+                    .setMessage("Chỉ xóa bản sao trong ứng dụng, không xóa tệp gốc của bạn.")
+                    .setPositiveButton("Xóa") { _,_ ->
+                        preview.isEnabled=false
+                        map?.setStyle(Style.Builder().fromJson(
+                            """{"version":8,"sources":{},"layers":[]}"""))
+                        executor.execute {
+                            val result=runCatching { store.deleteActiveArchive() }
+                            runOnUiThread {
+                                if(isFinishing||isDestroyed)return@runOnUiThread
+                                loaded=null
+                                message.text=when {
+                                    result.isFailure -> "Xóa thất bại: "+result.exceptionOrNull()?.message
+                                    result.getOrNull()==true -> "Đã xóa bản sao archive trong ứng dụng."
+                                    else -> "Không tìm thấy gói đang được chọn."
+                                }
+                            }
+                        }
                     }.setNegativeButton("Hủy",null).show()
             }
         })

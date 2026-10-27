@@ -68,9 +68,14 @@ def inspect_pack(pack: dict) -> dict:
         indexed.setdefault(segment, []).append(sign)
 
     # Nearby contradictory signs on the same directional segment warrant review.
+    comparison_budget = 200_000
     for segment, segment_signs in indexed.items():
         for i, a in enumerate(segment_signs):
             for b in segment_signs[i+1:]:
+                comparison_budget -= 1
+                if comparison_budget <= 0:
+                    add("error","density","Excessive nearby-sign comparisons; split/clean the dataset")
+                    break
                 if a.get("direction") != b.get("direction"):
                     continue
                 try:
@@ -92,6 +97,13 @@ def inspect_pack(pack: dict) -> dict:
                 elif a.get("kind") == b.get("kind"):
                     add("warning", segment,
                         "Potential duplicate: " + str(a.get("id")) + " and " + str(b.get("id")))
+                if len(issues) >= 1000:
+                    add("error","issue-limit","QA issue limit exceeded")
+                    break
+            if comparison_budget <= 0 or len(issues) >= 1000:
+                break
+        if comparison_budget <= 0 or len(issues) >= 1000:
+            break
 
     checks = {
         "segment_count": len(roads),
