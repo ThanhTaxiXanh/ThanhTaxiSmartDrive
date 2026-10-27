@@ -16,6 +16,7 @@
         <activity android:name=".navigation.RoutePreviewActivity" android:exported="false"/>
         <activity android:name=".offline.PmtilesManagerActivity" android:exported="false"/>
         <activity android:name=".offline.OfflineMapsActivity" android:exported="false"/>
+        <activity android:name=".offline.OfflinePoiActivity" android:exported="false"/>
         <activity android:name=".SettingsActivity" android:exported="false"/>
         <activity android:name=".MainActivity" android:exported="true"
             android:screenOrientation="unspecified">
