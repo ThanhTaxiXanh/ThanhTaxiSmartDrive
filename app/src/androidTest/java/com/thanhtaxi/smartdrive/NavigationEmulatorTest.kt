@@ -133,6 +133,56 @@ class NavigationEmulatorTest {
         } catch (_: IllegalArgumentException) {}
     }
 
+    @Test fun offlineDestinationAndTimedLaneRestrictionsParseOnEmulator() {
+        val app=InstrumentationRegistry.getInstrumentation().targetContext
+        val sample="""{
+          "schema":1,"title":"SYNTHETIC","source":"test only",
+          "license":"SYNTHETIC","segments":[
+            {"id":"ab","from":[21,106],"to":[21,106.001],
+             "roadKind":"TWO_WAY_OR_SINGLE_LANE_ONEWAY","populationZone":"UNKNOWN",
+             "reviewed":true,"sourceRef":"fixture"},
+            {"id":"bc","from":[21,106.001],"to":[21,106.002],
+             "roadKind":"TWO_WAY_OR_SINGLE_LANE_ONEWAY","populationZone":"UNKNOWN",
+             "reviewed":true,"sourceRef":"fixture"}],
+          "routing":{
+            "nodes":[{"id":"A","lat":21,"lon":106},
+                     {"id":"B","lat":21,"lon":106.001,
+                      "displayName":"Điểm thử B","aliases":["Ben B"]},
+                     {"id":"C","lat":21,"lon":106.002}],
+            "edges":[
+              {"id":"ab","fromNode":"A","toNode":"B","segmentId":"ab",
+               "direction":"forward","distanceMeters":104,"reviewed":true,"sourceRef":"fixture"},
+              {"id":"bc","fromNode":"B","toNode":"C","segmentId":"bc",
+               "direction":"forward","distanceMeters":104,"reviewed":true,"sourceRef":"fixture",
+               "modelSpeedKph":24,"restrictions":{"allowedLanes":[2],
+                                                 "blockedVehicles":["TRUCK"]}}],
+            "allowedTurns":[{"fromEdge":"ab","viaNode":"B","toEdge":"bc",
+                             "reviewed":true,"sourceRef":"fixture"}],
+            "destinations":[{"id":"poi-1","title":"Điểm đón thử","nodeId":"B",
+                             "category":"PICKUP","aliases":["Don khach"],
+                             "sourceRef":"fixture"}]
+          }
+        }"""
+        val g=com.thanhtaxi.smartdrive.data.RoadPackRepository(app)
+            .parse(sample).routeGraph!!
+        assertEquals("B",OfflineDestinationIndex(g).resolve("don khach").nodeId)
+        assertNull(g.routeTimed("A","C",RoutingVehicle.TAXI,
+            1793149200000L)) // lane unknown
+        val epoch=java.time.LocalDateTime.of(2026,10,27,10,0)
+            .atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+            .toInstant().toEpochMilli()
+        val timed=g.routeTimed("A","C",RoutingVehicle.TAXI,epoch,2)!!
+        assertTrue(g.isScheduledPlanValid(timed))
+        assertEquals(2,timed.schedule.size)
+        assertEquals(24.0,timed.schedule[1].modelSpeedKph,0.1)
+        assertEquals(1,RoutePreviewInstructions.generate(g,timed).size)
+        val nav=ActiveNavigationEngine(g)
+        nav.start(timed)
+        assertEquals(NavigationPhase.GPS_UNCERTAIN,
+            nav.observe(NavigationFix(21.0,106.0003,3.0,1000,90.0,4.0),
+                1000,epoch).phase) // manual lane cannot be inferred from GPS
+    }
+
     @Test fun mainDashboardCreatesWithoutRealGpsHardware() {
         // Validates the Android Activity, map widget and dashboard lifecycle on
         // the emulator; offline tiles and GPS measurement are tested separately.
