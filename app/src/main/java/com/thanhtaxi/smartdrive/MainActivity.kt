@@ -36,6 +36,8 @@ import com.thanhtaxi.smartdrive.offline.PmtilesArchiveStore
 import com.thanhtaxi.smartdrive.offline.PmtilesHeader
 import com.thanhtaxi.smartdrive.offline.PmtilesRasterStyle
 import com.thanhtaxi.smartdrive.offline.PmtilesVectorStyle
+import com.thanhtaxi.smartdrive.offline.OfflineRoadLabelOverlay
+import com.thanhtaxi.smartdrive.offline.OfflineRoadLabelSampler
 import org.maplibre.android.maps.Style
 import java.util.concurrent.Executors
 import org.maplibre.android.MapLibre
@@ -73,6 +75,8 @@ class MainActivity : Activity(), LocationListener {
     private var offlineHeader: PmtilesHeader? = null
     private val followCamera = FreeDriveCameraState()
     private lateinit var followButton: Button
+    private lateinit var roadLabels: OfflineRoadLabelOverlay
+    private var labelSampler: OfflineRoadLabelSampler?=null
 
     private var lastLocation: Location? = null
     private var lastFixElapsedMs = 0L
@@ -137,6 +141,8 @@ class MainActivity : Activity(), LocationListener {
         val mapPane = FrameLayout(this).apply { background = cardBackground() }
         mapView = MapView(this)
         mapPane.addView(mapView, FrameLayout.LayoutParams(-1,-1))
+        roadLabels=OfflineRoadLabelOverlay(this)
+        mapPane.addView(roadLabels,FrameLayout.LayoutParams(-1,-1))
         mapStatusLabel = label("Bản đồ: đang tải cấu hình…", 12f).apply {
             setBackgroundColor(0xC9121720.toInt())
             maxLines = 2
@@ -154,6 +160,10 @@ class MainActivity : Activity(), LocationListener {
         }
         mapView.getMapAsync { readyMap ->
             map = readyMap
+            labelSampler=OfflineRoadLabelSampler(readyMap,roadLabels)
+            readyMap.addOnCameraIdleListener {
+                labelSampler?.schedule()
+            }
             readyMap.addOnMapClickListener { coordinate ->
                 // Road name inspection is only active when parked; tile properties
                 // are unverified OSM labels and never become speed-limit evidence.
@@ -318,6 +328,7 @@ class MainActivity : Activity(), LocationListener {
         selectedStyleKey=key
         val epoch=++currentStyleEpoch
         offlineHeader=null
+        labelSampler?.setEnabled(false)
         if(mode!="pmtiles_raster" && mode!="pmtiles_vector") {
             mapStatusLabel.text = "Bản đồ online: cần Internet và tile server đang hoạt động."
             m.setStyle(url) {
@@ -356,6 +367,9 @@ class MainActivity : Activity(), LocationListener {
                     m.setStyle(Style.Builder().fromJson(generatedStyle)) {
                         if(epoch!=currentStyleEpoch) return@setStyle
                         offlineHeader=selected
+                        labelSampler?.setEnabled(validVector &&
+                            prefs.getBoolean("showOfflineRoadLabels",true))
+                        handler.postDelayed({ labelSampler?.schedule() },2200L)
                         vehicleMarker=null
                         lastMarkerLocation=null
                         val fix=lastLocation
@@ -596,6 +610,8 @@ class MainActivity : Activity(), LocationListener {
         roadIndex = RoadSpatialIndex(roadLines)
         stableMatcher.reset()
         stableMatch=null
+        if(offlineHeader?.tileType==1) labelSampler?.setEnabled(
+            prefs.getBoolean("showOfflineRoadLabels",true))
         loadSelectedMap()
         lastMarkerLocation = null
         renderNearbySigns(lastLocation)
@@ -603,6 +619,7 @@ class MainActivity : Activity(), LocationListener {
     }
     override fun onStart() { super.onStart(); mapView.onStart() }
     override fun onPause() {
+        labelSampler?.stop()
         handler.removeCallbacks(tick); locationManager.removeUpdates(this)
         stableMatcher.reset()
         stableMatch=null
@@ -610,6 +627,7 @@ class MainActivity : Activity(), LocationListener {
     }
     override fun onStop() { mapView.onStop(); super.onStop() }
     override fun onDestroy() {
+        labelSampler?.stop()
         currentStyleEpoch++
         mapWorker.shutdownNow()
         map?.removeAnnotations(signMarkers)

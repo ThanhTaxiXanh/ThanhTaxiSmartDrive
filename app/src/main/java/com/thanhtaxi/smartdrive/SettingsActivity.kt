@@ -84,6 +84,13 @@ class SettingsActivity : Activity() {
             text="Nếu bản đồ xanh/trống: kiểm tra 4G/Wi-Fi, quyền Internet, style URL và tile server. " +
                 "GPS hoạt động không chứng minh tile đã tải. Tên biển số tốc độ -- là bình thường khi chưa nhập dữ liệu."
         })
+        content.addView(CheckBox(this).apply {
+            text="Hiển thị tên/mã tuyến offline từ PMTiles (nếu có)"
+            isChecked=prefs.getBoolean("showOfflineRoadLabels",true)
+            setOnCheckedChangeListener { _,enabled ->
+                prefs.edit().putBoolean("showOfflineRoadLabels",enabled).apply()
+            }
+        })
         heading("Bản đồ offline (khi xe đã đỗ)")
         action("Quản lý vùng tải offline Bắc Giang / Bắc Ninh") {
             openParkedTool(OfflineMapsActivity::class.java)

@@ -42,6 +42,9 @@ class PmtilesManagerActivity : Activity() {
     private lateinit var vectorLayerInput: AutoCompleteTextView
     private lateinit var vectorStatus: TextView
     private lateinit var tappedRoad: TextView
+    private lateinit var nameOverlay: OfflineRoadLabelOverlay
+    private var nameSampler: OfflineRoadLabelSampler?=null
+    private lateinit var namesCheck: CheckBox
     private lateinit var applyDashboard: Button
     private lateinit var mapView: MapView
     private lateinit var visibleTiles: CheckBox
@@ -116,6 +119,17 @@ class PmtilesManagerActivity : Activity() {
             updateVectorFieldHint()
         }
         controls.addView(vectorLayerInput)
+        namesCheck=CheckBox(this).apply {
+            text="Hiển thị tên/mã tuyến offline (nếu tile có dữ liệu)"
+            isChecked=getSharedPreferences("taxi",MODE_PRIVATE)
+                .getBoolean("showOfflineRoadLabels",true)
+            setOnCheckedChangeListener { _,checked ->
+                getSharedPreferences("taxi",MODE_PRIVATE).edit()
+                    .putBoolean("showOfflineRoadLabels",checked).apply()
+                nameSampler?.setEnabled(checked && loaded?.header?.tileType==1 && styleReady)
+            }
+        }
+        controls.addView(namesCheck)
         controls.addView(Button(this).apply {
             text="Xem thử đường vector đã nhập"
             setOnClickListener { showVector() }
@@ -216,6 +230,8 @@ class PmtilesManagerActivity : Activity() {
         mapView=MapView(this)
         val mapContainer=FrameLayout(this)
         mapContainer.addView(mapView,FrameLayout.LayoutParams(-1,-1))
+        nameOverlay=OfflineRoadLabelOverlay(this)
+        mapContainer.addView(nameOverlay,FrameLayout.LayoutParams(-1,-1))
         tappedRoad=TextView(this).apply {
             text="Chạm vào một đường vector khi xe đỗ để xem tên/mã tuyến trong OSM."
             textSize=14f
@@ -234,6 +250,8 @@ class PmtilesManagerActivity : Activity() {
         }
         mapView.getMapAsync { readyMap ->
             map=readyMap
+            nameSampler=OfflineRoadLabelSampler(readyMap,nameOverlay)
+            readyMap.addOnCameraIdleListener { nameSampler?.schedule() }
             readyMap.addOnMapClickListener { coordinate ->
                 if(loaded?.header?.tileType != 1 || !styleReady) {
                     false
@@ -376,11 +394,14 @@ class PmtilesManagerActivity : Activity() {
         }
         try {
             styleReady=false
+            nameSampler?.stop()
             m.setStyle(Style.Builder().fromJson(PmtilesVectorStyle.make(
                 archive.tileUri,layer,archive.attribution,
                 archive.header.minZoom.coerceAtMost(22),
                 archive.header.maxZoom.coerceAtMost(22)))) {
                 styleReady=true
+                nameSampler?.setEnabled(namesCheck.isChecked)
+                mapView.postDelayed({nameSampler?.schedule()},2200L)
                 m.cameraPosition=CameraPosition.Builder()
                     .target(LatLng(archive.header.centerLat,archive.header.centerLon))
                     .zoom(archive.header.centerZoom.toDouble().coerceIn(
@@ -395,6 +416,7 @@ class PmtilesManagerActivity : Activity() {
         }
     }
     private fun showRaster() {
+        nameSampler?.stop()
         val a=loaded ?:return
         if (!a.header.isRaster) return
         val m=map ?:run {
@@ -452,9 +474,18 @@ class PmtilesManagerActivity : Activity() {
     }
     override fun onStart(){super.onStart();if(::mapView.isInitialized)mapView.onStart()}
     override fun onResume(){super.onResume();if(::mapView.isInitialized)mapView.onResume()}
-    override fun onPause(){if(::mapView.isInitialized)mapView.onPause();super.onPause()}
+    override fun onPause(){
+        nameSampler?.stop()
+        if(::mapView.isInitialized)mapView.onPause()
+        super.onPause()
+    }
     override fun onStop(){if(::mapView.isInitialized)mapView.onStop();super.onStop()}
-    override fun onDestroy(){executor.shutdownNow();if(::mapView.isInitialized)mapView.onDestroy();super.onDestroy()}
+    override fun onDestroy(){
+        nameSampler?.stop()
+        executor.shutdownNow()
+        if(::mapView.isInitialized)mapView.onDestroy()
+        super.onDestroy()
+    }
     override fun onLowMemory(){super.onLowMemory();if(::mapView.isInitialized)mapView.onLowMemory()}
     override fun onSaveInstanceState(b:Bundle){if(::mapView.isInitialized)mapView.onSaveInstanceState(b);super.onSaveInstanceState(b)}
 }
