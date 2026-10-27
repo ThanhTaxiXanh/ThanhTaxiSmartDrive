@@ -30,6 +30,12 @@ def inspect_routing(routing, roads, add):
         if not isinstance(ident,str) or not ident or ident in ns:
             add("error","node","Duplicate/missing node ID")
             continue
+        name=n.get("displayName")
+        if name is not None and (
+            not isinstance(name,str) or len(name.strip())>100 or
+            any(ord(c)<32 or ord(c)==127 for c in name)
+        ):
+            add("error",ident,"Survey point displayName must be a short clean string")
         ns[ident]=n
         try:
             lat=float(n["lat"]);lon=float(n["lon"])

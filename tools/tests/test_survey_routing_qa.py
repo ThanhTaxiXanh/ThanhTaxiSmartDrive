@@ -34,6 +34,17 @@ class SurveyRoutingQaTests(unittest.TestCase):
         g,r=sample()
         g["allowedTurns"][0]["viaNode"]="C"
         self.assertTrue(errors(g,r))
+    def test_display_name_needs_clean_user_supplied_metadata(self):
+        g,r=sample()
+        g["nodes"][0]["displayName"]="Bến xe"
+        self.assertEqual([],errors(g,r))
+        g["nodes"][0]["displayName"]="x"*120
+        self.assertTrue(errors(g,r))
+        g["nodes"][0]["displayName"]=1234
+        self.assertTrue(errors(g,r))
+        g["nodes"][0]["displayName"]="Trạm\\nGiả lập"
+        self.assertTrue(errors(g,r))
+
     def test_missing_source_ref(self):
         g,r=sample()
         g["allowedTurns"][0]["sourceRef"]=""
